@@ -115,11 +115,12 @@ public:
 
         // start ans.size kernels for parallel work on threads
         elem_min<<<1, ans._size>>>(d_left, d_right, d_ans);
-        
+
         cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) 
+        if (err != cudaSuccess){
             printf("Error: %s\n", cudaGetErrorString(err));
             exit(0);
+        }
 
         // get ans from devise
         cudaMemcpy(ans._data, d_ans, sizeof(T) * ans._size, cudaMemcpyDeviceToHost);
