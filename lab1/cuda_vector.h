@@ -117,15 +117,16 @@ public:
         elem_min<<<1, ans._size>>>(d_left, d_right, d_ans);
 
         cudaError_t err = cudaGetLastError();
+        // check errors
         if (err != cudaSuccess){
-            printf("Error: %s\n", cudaGetErrorString(err));
+            printf("ERROR: %s\n", cudaGetErrorString(err));
             exit(0);
         }
 
         // get ans from devise
         cudaMemcpy(ans._data, d_ans, sizeof(T) * ans._size, cudaMemcpyDeviceToHost);
-        // free mem
 
+        // free mem
         cudaFree(d_left);
         cudaFree(d_right);
         cudaFree(d_ans);
