@@ -44,7 +44,7 @@ public:
             if(i){
                 os << " ";
             }
-            os << std::fixed << std::setprecision(10) << vec[i];
+            os << std::scientific << std::setprecision(10) << vec[i];
         }
         return os;
     }
