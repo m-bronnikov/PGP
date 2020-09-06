@@ -19,6 +19,9 @@ int main(){
         cin >> right[i];
     }
 
+    cout << left << endl;
+    cout << right << endl;
+
     // main func (4 variant)
     min2(left, right, ans);
 
