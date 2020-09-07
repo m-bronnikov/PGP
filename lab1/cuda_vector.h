@@ -11,10 +11,14 @@
 using namespace std;
 
 #define  MAXDELTA 10000
+#define MAXPTHS 512
 
 template<typename T>
-__global__ void elem_min(T* d_left, T* d_right, T* d_ans){
-    int idx = threadIdx.x;
+__global__ void elem_min(T* d_left, T* d_right, T* d_ans, int size){
+    int idx = blockDim.x * blockIdx.x +  threadIdx.x;
+    if(idx >= size){
+        return;
+    }
     T l_v = d_left[idx];
     T r_v = d_right[idx];
     d_ans[idx] = l_v < r_v ? l_v : r_v;
@@ -114,7 +118,10 @@ public:
         cudaMemcpy(d_right, right._data, sizeof(T) * right._size, cudaMemcpyHostToDevice);
 
         // start ans.size kernels for parallel work on threads
-        elem_min<<<1, ans._size>>>(d_left, d_right, d_ans);
+        int blocks = ans._size / MAXPTHS;
+        int plus_one = (ans._size == MAXPTHS * blocks) ? 0 : 1;
+
+        elem_min<<<blocks + plus_one, MAXPTHS>>>(d_left, d_right, d_ans, ans._size);
 
         cudaError_t err = cudaGetLastError();
         // check errors
