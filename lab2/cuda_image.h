@@ -129,16 +129,16 @@ public:
         cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
         cudaMallocArray(&a_data, &cfDesc, _canals * _widht, _height);
-        CUDA_SAFE_CALL(cudaMemcpyToArray(
-                                         a_data, 0, 0, _data,
-                                         sizeof(uint8_t) * _canals * _widht * _height,
-                                         cudaMemcpyHostToDevice
-                                        ));
+        cudaMemcpyToArray(
+                        a_data, 0, 0, _data,
+                        sizeof(uint8_t) * _canals * _widht * _height,
+                        cudaMemcpyHostToDevice
+        );
 
-        CUDA_SAFE_CALL(cudaBindTextureToArray(g_text, a_data));
+        cudaBindTextureToArray(g_text, a_data);
 
-        CUDA_SAFE_CALL(cudaMalloc((void**)&d_data,
-                                  sizeof(uint8_t) * _widht * _height * _canals));
+        cudaMalloc((void**)&d_data,
+                    sizeof(uint8_t) * _widht * _height * _canals);
 
         uint32_t bloks_x = _height / MAX_X;
         uint32_t bloks_y = _widht / MAX_Y;
@@ -149,17 +149,17 @@ public:
         dim3 threads = dim3(MAX_X, MAX_Y, _canals);
         dim3 blocks = dim3(bloks_x, bloks_y);
 
-        sobel<<<blocks, threads>>>(d_data, uint32_t _widht, uint32_t _height);
+        sobel<<<blocks, threads>>>(d_data, _widht, _height);
 
-        CUDA_SAFE_CALL(cudaMemcpy(
-                                  _data, d_data,
-                                  sizeof(uint8_t) * _widht * _height * _canals,
-                                  cudaMemcpyDeviceToHost
-                                  ));
+        cudaMemcpy(
+                _data, d_data,
+                sizeof(uint8_t) * _widht * _height * _canals,
+                cudaMemcpyDeviceToHost
+        );
 
-        CUDA_SAFE_CALL(cudaUnbindTexture(g_text));
-        CUDA_SAFE_CALL(cudaFree(d_data));
-        CUDA_SAFE_CALL(cudaFreeArray(a_data));
+        cudaUnbindTexture(g_text);
+        cudaFree(d_data);
+        udaFreeArray(a_data);
     }
 
 
