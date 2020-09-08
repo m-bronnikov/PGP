@@ -17,20 +17,56 @@ using namespace std;
 #define MAX_X 22
 #define MAX_Y 22
 
-#define MAX_HEIGHT 32768
+#define RED(x) ((x) >> 24)&255
+#define GREEN(x) ((x) >> 16)&255
+#define BLUE(x) ((x) >> 8)&255
+
 
 // 2 dimentional texture
 texture<uint32_t, 2, cudaReadModeElementType> g_text;
 
 // filter(variant #8)
-__global__ void sobel(uint32_t* ans, uint32_t h, uint32_t w){
+__global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 
     if(idx > h || idy > w){
         return;
     }
-    printf("[%d, %d] = %d\n", idx, idy, tex2D(g_text, idx, idy));
+    // ans pixel
+    uint32_t ans = 0;
+    
+    // locate area in mem(24 bite)
+    uint32_t w11 = tex2D(g_text, idx - 1, idy - 1);
+    uint32_t w12 = tex2D(g_text, idx, idy - 1);
+    uint32_t w13 = tex2D(g_text, idx + 1, idy - 1);
+    uint32_t w21 = tex2D(g_text, idx - 1, idy);
+
+    uint32_t w23 = tex2D(g_text, idx + 1, idy);
+    uint32_t w31 = tex2D(g_text, idx - 1, idy + 1);
+    uint32_t w32 = tex2D(g_text, idx, idy + 1);
+    uint32_t w33 = tex2D(g_text, idx + 1, idy + 1);
+
+    // red:
+    uint32_t G1 = RED(w13) + (RED(w23) << 1) + RED(w33) - RED(w11) - (RED(w21) << 1) - RED(w31); 
+    uint32_t G2 = RED(w31) + (RED(w32) << 1) + RED(w33) - RED(w11) - (RED(w12) << 1) - RED(w13);
+    uint32_t gradf = sqrt((double)(G1*G1 + G2*G2));
+    gradf = gradf > 255 ? 255 : gradf;
+    ans ^= (gradf << 24);
+
+    // green:
+    G1 = GREEN(w13) + (GREEN(w23) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w21) << 1) - GREEN(w31); 
+    G2 = GREEN(w31) + (GREEN(w32) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w12) << 1) - GREEN(w13);
+    gradf = sqrt((double)(G1*G1 + G2*G2));
+    gradf = gradf > 255 ? 255 : gradf;
+    ans ^= (gradf << 16);
+
+    // blue:
+    G1 = BLUE(w13) + (BLUE(w23) << 1) + BLUE(w33) - BLUE(w11) - (BLUE(w21) << 1) - BLUE(w31); 
+    G2 = BLUE(w31) + (BLUE(w32) << 1) + BLUE(w33) - BLUE(w11) - (BLUE(w12) << 1) - BLUE(w13);
+    gradf = sqrt((double)(G1*G1 + G2*G2));
+    gradf = gradf > 255 ? 255 : gradf;
+    ans ^= (gradf << 8);
 }
 
 // exceptions if error
