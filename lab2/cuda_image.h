@@ -92,7 +92,7 @@ public:
         cin >> temp;
         img._widht = CUDAImage::reverse(temp);
         cin >> temp;
-        img._height = CUDAImage::reverse(tmp);
+        img._height = CUDAImage::reverse(temp);
         img._data = (uint8_t*) realloc(img._data, 3*sizeof(uint8_t)*img._widht*img._height);
 
         for(uint32_t i = 0; i < img._height; ++i){
@@ -123,9 +123,9 @@ public:
         g_text.addressMode[0] = cudaAddressModeClamp;
         g_text.addressMode[1] = cudaAddressModeClamp;
         g_text.addressMode[2] = cudaAddressModeClamp;
-        g_text.normilized = false;
+        g_text.normalized = false;
 
-        cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatUnsigned);
+        cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
         CUDA_SAFE_CALL(cudaMallocArray(&a_data, &cfDesc, _canals * _widht, _height));
         CUDA_SAFE_CALL(cudaMemcpyToArray(
@@ -158,7 +158,7 @@ public:
 
         CUDA_SAFE_CALL(cudaUnbindTexture(g_text));
         CUDA_SAFE_CALL(cudaFree(d_data));
-        CuDA_SAFE_CALL(cudaFreeArray(a_data));
+        CUDA_SAFE_CALL(cudaFreeArray(a_data));
     }
 
 
