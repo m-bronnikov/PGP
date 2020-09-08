@@ -15,7 +15,7 @@ int main(){
     cin >> img;
     img.FilterImg();
 
-    fout.close()
+    fout.close();
     fin.close();
     return 0;
 }

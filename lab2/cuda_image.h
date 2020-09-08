@@ -159,7 +159,7 @@ public:
 
         cudaUnbindTexture(g_text);
         cudaFree(d_data);
-        udaFreeArray(a_data);
+        cudaFreeArray(a_data);
     }
 
 
