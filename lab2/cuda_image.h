@@ -23,7 +23,7 @@ __global__ void sobel(uint8_t* ans, uint32_t w, uint32_t h){
     if(idx > h || idy > w){
         return;
     }
-    printf("[%d, %d, %d] = %d", idx, idy, 0, text3D(g_text, idx, idy, 0);
+    printf("[%d, %d, %d] = %d\n", idx, idy, 0, text3D(g_text, idx, idy, 0));
 }
 
 
