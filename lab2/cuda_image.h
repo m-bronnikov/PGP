@@ -119,13 +119,11 @@ public:
     void FilterImg(){
         uint8_t* d_data = nullptr;
         cudaArray* a_data = nullptr;
-        /*
         g_text.addressMode[0] = cudaAddressModeClamp;
         g_text.addressMode[1] = cudaAddressModeClamp;
         g_text.addressMode[2] = cudaAddressModeClamp;
         g_text.normalized = false;
-        */
-        /*
+
         cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
         cudaMallocArray(&a_data, &cfDesc, _canals * _widht * sizeof(uint8_t), _height);
@@ -152,7 +150,7 @@ public:
 
         sobel<<<blocks, threads>>>(d_data, _widht, _height);
 
-
+        //cout << "Here" << endl;
         cudaMemcpy(
                 _data, d_data,
                 sizeof(uint8_t) * _widht * _height * _canals,
@@ -162,7 +160,7 @@ public:
         cudaUnbindTexture(g_text);
         cudaFree(d_data);
         cudaFreeArray(a_data);
-        */
+        
     }
 
 
