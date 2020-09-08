@@ -29,7 +29,7 @@ __global__ void sobel(uint8_t* ans, uint32_t w, uint32_t h){
 
 class CUDAImage{
 public:
-    CUDAImage() : _canals(3), _data(nullptr), _width(0), _height(0){}
+    CUDAImage() : _canals(3), _data(nullptr), _widht(0), _height(0){}
 
     CUDAImage(const string& path) : CUDAImage(){
         ifstream fin(path);
@@ -45,7 +45,7 @@ public:
 
     ~CUDAImage(){
         free(_data);
-        _height = _width = 0;
+        _height = _widht = 0;
     }
 
     // out is not parallel because order is important
