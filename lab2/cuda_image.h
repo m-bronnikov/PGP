@@ -21,7 +21,7 @@ texture<uint8_t, 3, cudaReadModeElementType> g_text;
 __global__ void sobel(uint8_t* ans, uint32_t w, uint32_t h){
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
-    uint32_t idz = threadIdx.z
+    uint32_t idz = threadIdx.z;
     if(idx > h || idy > w){
         return;
     }
