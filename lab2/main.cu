@@ -13,8 +13,13 @@ int main(){
     //ifstream fin(path1);
     //ofstream fout(path2);
     cin >> img;
-    img.FilterImg();
-    cout << img;
+    try{
+        img.FilterImg();
+        cout << img;
+    }catch(std::runtime_error &exception){
+        cout << "ERROR: " << exception.what() << endl;
+        return 0;
+    }
 
     //fout.close();
     //fin.close();

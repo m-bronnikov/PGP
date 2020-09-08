@@ -28,6 +28,15 @@ __global__ void sobel(uint8_t* ans, uint32_t w, uint32_t h){
     printf("[%d, %d, %d] = %d\n", idx, idy, idz, tex3D(g_text, idx, idy, idz));
 }
 
+void throw_on_cuda_error(cudaError_t code)
+{
+  if(code != cudaSuccess)
+  {
+    throw std::runtime_error(cudaGetErrorString(code));
+  }
+}
+
+
 
 class CUDAImage{
 public:
@@ -127,18 +136,25 @@ public:
 
         cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
-        cudaMallocArray(&a_data, &cfDesc, _canals * _widht * sizeof(uint8_t), _height);
-
-        cudaMemcpy2DToArray(
-                            a_data, 0, 0, _data, _canals * _widht * sizeof(uint8_t),
-                            _canals * _widht * sizeof(uint8_t), _height, cudaMemcpyHostToDevice
+        throw_on_cuda_error(
+            cudaMallocArray(&a_data, &cfDesc, _canals * _widht * sizeof(uint8_t), _height)
         );
 
+        throw_on_cuda_error(
+            cudaMemcpy2DToArray(
+                            a_data, 0, 0, _data, _canals * _widht * sizeof(uint8_t),
+                            _canals * _widht * sizeof(uint8_t), _height, cudaMemcpyHostToDevice
+            )
+        );
 
-        cudaBindTextureToArray(g_text, a_data);
+        throw_on_cuda_error(
+            cudaBindTextureToArray(g_text, a_data)
+        );
 
-        cudaMalloc((void**)&d_data,
-                    sizeof(uint8_t) * _widht * _height * _canals);
+        throw_on_cuda_error(
+            cudaMalloc((void**)&d_data,
+                    sizeof(uint8_t) * _widht * _height * _canals)
+        );
 
         uint32_t bloks_x = _height / MAX_X;
         uint32_t bloks_y = _widht / MAX_Y;
@@ -150,17 +166,20 @@ public:
         dim3 blocks = dim3(bloks_x, bloks_y);
 
         sobel<<<blocks, threads>>>(d_data, _widht, _height);
+        throw_on_cuda_error(cudaGetLastError());
 
         //cout << "Here" << endl;
-        cudaMemcpy(
+        throw_on_cuda_error(
+            cudaMemcpy(
                 _data, d_data,
                 sizeof(uint8_t) * _widht * _height * _canals,
                 cudaMemcpyDeviceToHost
+            )
         );
 
-        cudaUnbindTexture(g_text);
-        cudaFree(d_data);
-        cudaFreeArray(a_data);
+        throw_on_cuda_error(cudaUnbindTexture(g_text));
+        throw_on_cuda_error(cudaFree(d_data));
+        throw_on_cuda_error(cudaFreeArray(a_data));
         
     }
 
