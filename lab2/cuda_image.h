@@ -33,8 +33,8 @@ public:
 
     CUDAImage(const string& path) : CUDAImage(){
         ifstream fin(path);
-        if (!fin.is_open()){
-            cout << "ERROR: File coudnt be open" << endl;
+        if(!fin.is_open()){
+            cout << "ERROR" << endl;
             exit(0);
         }
 
@@ -49,7 +49,7 @@ public:
     }
 
     // out is not parallel because order is important
-    friend ostream& operator<<(ostream& os, const CUDAImage<T>& img){
+    friend ostream& operator<<(ostream& os, const CUDAImage& img){
         os.unsetf(ios::dec);
         os.setf(ios::hex | ios::uppercase);
         uint32_t temp;
