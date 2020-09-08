@@ -128,11 +128,7 @@ public:
         cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
         cudaMallocArray(&a_data, &cfDesc, _canals * _widht * sizeof(uint8_t), _height);
-        cudaMemcpyToArray(
-                        a_data, 0, 0, _data,
-                        sizeof(uint8_t) * _canals * _widht * _height,
-                        cudaMemcpyHostToDevice
-        );
+
         cudaMemcpy2DToArray(
                             a_data, 0, 0, _data, _canals * _widht * sizeof(uint8_t),
                             _canals * _widht * sizeof(uint8_t), _height, cudaMemcpyHostToDevice
