@@ -9,25 +9,31 @@
 #include <stdlib.h>
 #include <string>
 #include <fstream>
+#include <algorithm>
 
 using namespace std;
 
+// max threads is 512 in block => sqrt(512) is dim
+#define MAX_X 22
+#define MAX_Y 22
 
-#define MAX_X 13
-#define MAX_Y 13
+#define MAX_HEIGHT 32768
 
-texture<uint8_t, 3, cudaReadModeElementType> g_text;
+// 2 dimentional texture
+texture<uint32_t, 2, cudaReadModeElementType> g_text;
 
-__global__ void sobel(uint8_t* ans, uint32_t w, uint32_t h){
+// filter(variant #8)
+__global__ void sobel(uint32_t* ans, uint32_t h, uint32_t w){
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
-    uint32_t idz = threadIdx.z;
+
     if(idx > h || idy > w){
         return;
     }
-    printf("[%d, %d, %d] = %d\n", idx, idy, idz, tex3D(g_text, idx, idy, idz));
+    printf("[%d, %d] = %d\n", idx, idy, tex2D(g_text, idx, idy));
 }
 
+// exceptions if error
 void throw_on_cuda_error(cudaError_t code)
 {
   if(code != cudaSuccess)
@@ -37,10 +43,10 @@ void throw_on_cuda_error(cudaError_t code)
 }
 
 
-
+// Image
 class CUDAImage{
 public:
-    CUDAImage() : _canals(3), _data(nullptr), _widht(0), _height(0){}
+    CUDAImage() : _data(nullptr), _widht(0), _height(0){}
 
     CUDAImage(const string& path) : CUDAImage(){
         ifstream fin(path);
@@ -65,26 +71,24 @@ public:
         os.setf(ios::hex | ios::uppercase);
         uint32_t temp;
 
-        temp = CUDAImage::reverse(img._widht);
-        cout << setfill('0') << setw(8) <<  temp  << " ";
-        temp = CUDAImage::reverse(img._height);
-        cout << setfill('0') << setw(8) <<  temp  << endl;
+        if(img._transpose){
+            temp = CUDAImage::reverse(img._height);
+            cout << setfill('0') << setw(8) <<  temp  << " ";
+            temp = CUDAImage::reverse(img._widht);
+            cout << setfill('0') << setw(8) <<  temp  << endl;
+        }else{
+            temp = CUDAImage::reverse(img._widht);
+            cout << setfill('0') << setw(8) <<  temp  << " ";
+            temp = CUDAImage::reverse(img._height);
+            cout << setfill('0') << setw(8) <<  temp  << endl;            
+        }
 
         for(uint32_t i = 0; i < img._height; ++i){
             for(uint32_t j = 0; j < img._widht; ++j){
                 if(j){
                     cout << " ";
                 }
-                cout << setfill('0') << setw(2);
-                cout << (uint32_t) img._data[3*i*img._widht + 3*j];
-
-                cout << setfill('0') << setw(2);
-                cout << (uint32_t) img._data[3*i*img._widht + 3*j + 1];
-
-                cout << setfill('0') << setw(2);
-                cout << (uint32_t) img._data[3*i*img._widht + 3*j + 2];
-
-                cout << "00";
+                cout << setfill('0') << setw(8) << img._data[i*img._widht + j];
             }
             cout << endl;
         }
@@ -104,14 +108,22 @@ public:
         img._widht = CUDAImage::reverse(temp);
         cin >> temp;
         img._height = CUDAImage::reverse(temp);
-        img._data = (uint8_t*) realloc(img._data, 3*sizeof(uint8_t)*img._widht*img._height);
+        img._data = (uint32_t*) realloc(img._data, sizeof(uint32_t)*img._widht*img._height);
 
-        for(uint32_t i = 0; i < img._height; ++i){
-            for(uint32_t j = 0; j < img._widht; ++j){
-                cin >> temp;
-                img._data[3*i*img._widht + 3*j] = (temp >> 24) & 255;
-                img._data[3*i*img._widht + 3*j + 1] = (temp >> 16) & 255;
-                img._data[3*i*img._widht + 3*j + 2] = (temp >> 8) & 255;
+        img._transpose = img._widht > img._height ? 0 : 1;
+
+        if(img._transpose){
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    cin >> img._data[i + img._height*j];
+                }
+            }
+            std::swap(img._widht, img._height);
+        }else{
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    cin >> img._data[i*img._widht + j];
+                }
             }
         }
 
@@ -126,34 +138,41 @@ public:
         _widht = _height = 0;
     }
 
-    void FilterImg(){
-        uint8_t* d_data = nullptr;
+    // 10000 
+    // make filration
+    void cuda_filter_img(){
+        // device data
+        uint32_t* d_data = nullptr;
         cudaArray* a_data = nullptr;
+
+        // use clamp optimisation for limit exits
         g_text.addressMode[0] = cudaAddressModeClamp;
         g_text.addressMode[1] = cudaAddressModeClamp;
-        g_text.addressMode[2] = cudaAddressModeClamp;
         g_text.normalized = false;
 
-        cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
+        // prepare data
+
+        // out:
+        throw_on_cuda_error(
+            cudaMalloc((void**)&d_data, sizeof(uint32_t) * _widht * _height)
+        );
+
+        // texture:
+        cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
         throw_on_cuda_error(
-            cudaMallocArray(&a_data, &cfDesc, _canals * _widht * sizeof(uint8_t), _height)
+            cudaMalloc3DArray(&a_data, &cfDesc, {_widht, _height, 0})
         );
 
         throw_on_cuda_error(
             cudaMemcpy2DToArray(
-                            a_data, 0, 0, _data, _canals * _widht * sizeof(uint8_t),
-                            _canals * _widht * sizeof(uint8_t), _height, cudaMemcpyHostToDevice
+                    a_data, 0, 0, _data, _widht * sizeof(uint32_t),
+                    _widht * sizeof(uint32_t), _height, cudaMemcpyHostToDevice
             )
         );
 
         throw_on_cuda_error(
-            cudaBindTextureToArray(g_text, a_data)
-        );
-
-        throw_on_cuda_error(
-            cudaMalloc((void**)&d_data,
-                    sizeof(uint8_t) * _widht * _height * _canals)
+            cudaBindTextureToArray(g_text, a_data, cfDesc)
         );
 
         uint32_t bloks_x = _height / MAX_X;
@@ -162,17 +181,18 @@ public:
         bloks_x += bloks_x * MAX_X < _height ? 1 : 0;
         bloks_y += bloks_y * MAX_Y < _widht ? 1 : 0;
 
-        dim3 threads = dim3(MAX_X, MAX_Y, _canals);
+        dim3 threads = dim3(MAX_X, MAX_Y);
         dim3 blocks = dim3(bloks_x, bloks_y);
 
-        sobel<<<blocks, threads>>>(d_data, _widht, _height);
+        // run filter
+        sobel<<<blocks, threads>>>(d_data, _height, _widht);
         throw_on_cuda_error(cudaGetLastError());
 
-        //cout << "Here" << endl;
+        
         throw_on_cuda_error(
             cudaMemcpy(
                 _data, d_data,
-                sizeof(uint8_t) * _widht * _height * _canals,
+                sizeof(uint32_t) * _widht * _height,
                 cudaMemcpyDeviceToHost
             )
         );
@@ -185,6 +205,7 @@ public:
 
 
 private:
+    // MSB-first to LSB-first:
     static uint32_t reverse(uint32_t num){
         uint32_t ans = 0;
         for(uint32_t i = 0; i < 4; ++i){
@@ -194,10 +215,10 @@ private:
         return ans;
     }
 
-    uint8_t* _data;
-    size_t _height;
-    size_t _widht;
-    const size_t _canals;
+    uint32_t* _data;
+    uint32_t _height;
+    uint32_t _widht;
+    uint8_t _transpose;
 };
 
 

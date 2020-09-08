@@ -14,7 +14,7 @@ int main(){
     //ofstream fout(path2);
     cin >> img;
     try{
-        img.FilterImg();
+        img.cuda_filter_img();
         cout << img;
     }catch(std::runtime_error &exception){
         cout << "ERROR: " << exception.what() << endl;
