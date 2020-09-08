@@ -148,14 +148,17 @@ public:
 
         dim3 threads = dim3(MAX_X, MAX_Y, _canals);
         dim3 blocks = dim3(bloks_x, bloks_y);
-
+        /*
         sobel<<<blocks, threads>>>(d_data, _widht, _height);
+
 
         cudaMemcpy(
                 _data, d_data,
                 sizeof(uint8_t) * _widht * _height * _canals,
                 cudaMemcpyDeviceToHost
         );
+
+        */
 
         cudaUnbindTexture(g_text);
         cudaFree(d_data);
