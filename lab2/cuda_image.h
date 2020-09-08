@@ -1,4 +1,4 @@
-// Made by Max Bronnikov 
+// Made by Max Bronnikov
 #ifndef CUDA_IMAGE_H
 #define CUDA_IMAGE_H
 
@@ -13,11 +13,17 @@
 using namespace std;
 
 
-#define MAXPTHS 512
+#define MAX_X 13
+#define MAX_Y 13
 
 texture<uint8_t, 3, cudaReadModeElementType> g_text;
 __global__ void sobel(uint8_t* ans, uint32_t w, uint32_t h){
-
+    uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+    if(idx > h || idy > w){
+        return;
+    }
+    printf("[%d, %d, %d] = %d", idx, idy, 0, text3D(g_text, idx, idy, 0);
 }
 
 
@@ -52,7 +58,7 @@ public:
         cout << setfill('0') << setw(8) <<  temp  << " ";
         temp = CUDAImage::reverse(img._height);
         cout << setfill('0') << setw(8) <<  temp  << endl;
-        
+
         for(uint32_t i = 0; i < img._height; ++i){
             for(uint32_t j = 0; j < img._widht; ++j){
                 if(j){
@@ -78,7 +84,7 @@ public:
     }
 
 
-    friend istream& operator>>(istream& is, CUDAImage<T>& img){
+    friend istream& operator>>(istream& is, CUDAImage& img){
         is.unsetf(ios::dec);
         is.setf(ios::hex);
 
@@ -97,7 +103,7 @@ public:
                 img._data[3*i*img._widht + 3*j + 2] = (temp >> 8) & 255;
             }
         }
-        
+
         is.unsetf(ios::hex);
         is.setf(ios::dec);
         return is;
@@ -112,7 +118,7 @@ public:
     void FilterImg(){
         //uint8_t* h_data = (uint8_t*) malloc(3*sizeof(uint8_t)*_widht*_height);
         uint8_t* d_data = nullptr;
-        cudaArray* a_data = nullptr; 
+        cudaArray* a_data = nullptr;
 
         g_text.addressMode[0] = cudaAddressModeClamp;
         g_text.addressMode[1] = cudaAddressModeClamp;
@@ -120,11 +126,39 @@ public:
         g_text.normilized = false;
 
         cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatUnsigned);
-        CUDA_SAFE_CALL(cudaMallocArray(&paA, &cfDesc, 3 * _widht, _height));
 
-        CUDA_SAFE_CALL(cudaMemcpyToArray(paA, 0, 0, _data, 3 * _widht * _height, cudaMemcpyHostToDevice));
-        CUDA_SAFE_CALL(cudaBindTextureToArray(g_text, paA));
+        CUDA_SAFE_CALL(cudaMallocArray(&a_data, &cfDesc, _canals * _widht, _height));
+        CUDA_SAFE_CALL(cudaMemcpyToArray(
+                                         a_data, 0, 0, _data,
+                                         sizeof(uint8_t) * _canals * _widht * _height,
+                                         cudaMemcpyHostToDevice
+                                        ));
 
+        CUDA_SAFE_CALL(cudaBindTextureToArray(g_text, a_data));
+
+        CUDA_SAFE_CALL(cudaMalloc((void**)&d_data,
+                                  sizeof(uint8_t) * _widht * _height * _canals));
+
+        uint32_t bloks_x = _height / MAX_X;
+        uint32_t bloks_y = _widht / MAX_Y;
+
+        bloks_x += bloks_x * MAX_X < _height ? 1 : 0;
+        bloks_y += bloks_y * MAX_Y < _widht ? 1 : 0;
+
+        dim3 threads = dim3(MAX_X, MAX_Y, _canals);
+        dim3 blocks = dim3(bloks_x, bloks_y);
+
+        sobel<<<blocks, threads>>>(d_data, uint32_t _widht, uint32_t _height);
+
+        CUDA_SAFE_CALL(cudaMemcpy(
+                                  _data, d_data,
+                                  sizeof(uint8_t) * _widht * _height * _canals,
+                                  cudaMemcpyDeviceToHost
+                                  ));
+
+        CUDA_SAFE_CALL(cudaUnbindTexture(g_text));
+        CUDA_SAFE_CALL(cudaFree(d_data));
+        CuDA_SAFE_CALL(cudaFreeArray(a_data));
     }
 
 
