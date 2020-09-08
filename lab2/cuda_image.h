@@ -117,7 +117,6 @@ public:
     }
 
     void FilterImg(){
-        //uint8_t* h_data = (uint8_t*) malloc(3*sizeof(uint8_t)*_widht*_height);
         uint8_t* d_data = nullptr;
         cudaArray* a_data = nullptr;
 
@@ -128,12 +127,17 @@ public:
 
         cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
-        cudaMallocArray(&a_data, &cfDesc, _canals * _widht, _height);
+        cudaMallocArray(&a_data, &cfDesc, _canals * _widht * sizeof(uint8_t), _height);
         cudaMemcpyToArray(
                         a_data, 0, 0, _data,
                         sizeof(uint8_t) * _canals * _widht * _height,
                         cudaMemcpyHostToDevice
         );
+        cudaMemcpy2DToArray(
+                            a_data, 0, 0, _data, _canals * _widht * sizeof(uint8_t),
+                            _canals * _widht * sizeof(uint8_t), _height, cudaMemcpyHostToDevice
+        );
+
 
         cudaBindTextureToArray(g_text, a_data);
 
@@ -164,7 +168,6 @@ public:
 
 
 private:
-
     static uint32_t reverse(uint32_t num){
         uint32_t ans = 0;
         for(uint32_t i = 0; i < 4; ++i){
