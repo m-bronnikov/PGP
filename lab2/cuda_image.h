@@ -17,6 +17,7 @@ using namespace std;
 #define MAX_Y 13
 
 texture<uint8_t, 3, cudaReadModeElementType> g_text;
+
 __global__ void sobel(uint8_t* ans, uint32_t w, uint32_t h){
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -127,7 +128,7 @@ public:
 
         cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
-        CUDA_SAFE_CALL(cudaMallocArray(&a_data, &cfDesc, _canals * _widht, _height));
+        cudaMallocArray(&a_data, &cfDesc, _canals * _widht, _height);
         CUDA_SAFE_CALL(cudaMemcpyToArray(
                                          a_data, 0, 0, _data,
                                          sizeof(uint8_t) * _canals * _widht * _height,
