@@ -14,6 +14,7 @@ int main(){
     ofstream fout(path2);
     cin >> img;
     img.FilterImg();
+    cout << img;
 
     fout.close();
     fin.close();

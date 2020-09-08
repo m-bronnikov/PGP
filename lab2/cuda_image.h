@@ -124,7 +124,7 @@ public:
         g_text.addressMode[1] = cudaAddressModeClamp;
         g_text.addressMode[2] = cudaAddressModeClamp;
         g_text.normalized = false;
-
+        /*
         cudaChannelFormatDesc cfDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
 
         cudaMallocArray(&a_data, &cfDesc, _canals * _widht * sizeof(uint8_t), _height);
@@ -148,7 +148,7 @@ public:
 
         dim3 threads = dim3(MAX_X, MAX_Y, _canals);
         dim3 blocks = dim3(bloks_x, bloks_y);
-        /*
+
         sobel<<<blocks, threads>>>(d_data, _widht, _height);
 
 
