@@ -17,7 +17,7 @@ using namespace std;
 #define MAX_X 22
 #define MAX_Y 22
 
-#define RED(x) ((x) >> 24)&255
+#define RED(x) ((x) >> 24)
 #define GREEN(x) ((x) >> 16)&255
 #define BLUE(x) ((x) >> 8)&255
 
@@ -68,7 +68,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     gradf = gradf > 255 ? 255 : gradf;
     ans ^= (gradf << 8);
 
-    d_data[idx*w + idy] = ans;
+    d_data[idy*w + idx] = ans;
 }
 
 // exceptions if error
