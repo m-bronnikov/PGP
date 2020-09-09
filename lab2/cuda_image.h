@@ -73,7 +73,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     ans ^= (gradf << 8);
 
     // locate in global mem
-    d_data[idx*w + idy] = ans;
+    d_data[idy*w + idx] = ans;
     /*
     // red:
     int32_t G1 = RED(w13) + (RED(w23) << 1) + RED(w33) - RED(w11) - (RED(w21) << 1) - RED(w31);
