@@ -20,6 +20,7 @@ using namespace std;
 #define RED(x) ((x) >> 24)
 #define GREEN(x) ((x) >> 16)&255
 #define BLUE(x) ((x) >> 8)&255
+#define GREY(x) 0.299*((float) RED(x)) + 0.587*((float) GREEN(x)) + 0.114*((float) BLUE(x))
 
 
 // 2 dimentional texture
@@ -43,20 +44,31 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     }
     // ans pixel
     uint32_t ans = 0;
-    
-    // locate area in mem(24 bite)
-    int32_t w11 = tex2D(g_text, idx - 1, idy - 1);
-    int32_t w12 = tex2D(g_text, idx, idy - 1);
-    int32_t w13 = tex2D(g_text, idx + 1, idy - 1);
-    int32_t w21 = tex2D(g_text, idx - 1, idy);
 
-    int32_t w23 = tex2D(g_text, idx + 1, idy);
-    int32_t w31 = tex2D(g_text, idx - 1, idy + 1);
-    int32_t w32 = tex2D(g_text, idx, idy + 1);
-    int32_t w33 = tex2D(g_text, idx + 1, idy + 1);
+    // locate area in mem(32 bite)
+    float w11 = GREY(tex2D(g_text, idx - 1, idy - 1));
+    float w12 = GREY(tex2D(g_text, idx, idy - 1));
+    float w13 = GREY(tex2D(g_text, idx + 1, idy - 1));
+    float w21 = GREY(tex2D(g_text, idx - 1, idy));
 
+    float w23 = GREY(tex2D(g_text, idx + 1, idy));
+    float w31 = GREY(tex2D(g_text, idx - 1, idy + 1));
+    float w32 = GREY(tex2D(g_text, idx, idy + 1));
+    float w33 = GREY(tex2D(g_text, idx + 1, idy + 1));
+
+    float G1 = w13 + (w23 << 1) + w33 - w11 - (w21 << 1) - w31;
+    float G1 = w31 + (w32 << 1) + w33 - w11 - (w12 << 1) - w13;
+
+    uint32_t gradf = (uint32_t)sqrt(G1*G1 + G2*G2);
+    gradf = gradf > 255 ? 255 : gradf;
+    ans ^= (gradf << 24);
+    ans ^= (gradf << 16);
+    ans ^= (gradf << 8);
+
+    d_data[idx*w + idy] = ans;
+    /*
     // red:
-    int32_t G1 = RED(w13) + (RED(w23) << 1) + RED(w33) - RED(w11) - (RED(w21) << 1) - RED(w31); 
+    int32_t G1 = RED(w13) + (RED(w23) << 1) + RED(w33) - RED(w11) - (RED(w21) << 1) - RED(w31);
     int32_t G2 = RED(w31) + (RED(w32) << 1) + RED(w33) - RED(w11) - (RED(w12) << 1) - RED(w13);
     uint32_t gradf = sqrt((double)(G1*G1 + G2*G2));
     gradf = gradf > 255 ? 255 : gradf;
@@ -71,14 +83,14 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     }
 
     // green:
-    G1 = GREEN(w13) + (GREEN(w23) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w21) << 1) - GREEN(w31); 
+    G1 = GREEN(w13) + (GREEN(w23) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w21) << 1) - GREEN(w31);
     G2 = GREEN(w31) + (GREEN(w32) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w12) << 1) - GREEN(w13);
     gradf = sqrt((double)(G1*G1 + G2*G2));
     gradf = gradf > 255 ? 255 : gradf;
     ans ^= (gradf << 16);
 
     // blue:
-    G1 = BLUE(w13) + (BLUE(w23) << 1) + BLUE(w33) - BLUE(w11) - (BLUE(w21) << 1) - BLUE(w31); 
+    G1 = BLUE(w13) + (BLUE(w23) << 1) + BLUE(w33) - BLUE(w11) - (BLUE(w21) << 1) - BLUE(w31);
     G2 = BLUE(w31) + (BLUE(w32) << 1) + BLUE(w33) - BLUE(w11) - (BLUE(w12) << 1) - BLUE(w13);
     gradf = sqrt((double)(G1*G1 + G2*G2));
     gradf = gradf > 255 ? 255 : gradf;
@@ -86,6 +98,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
 
     // to global mem
     d_data[idx*w + idy] = ans;
+    */
 }
 
 // exceptions if error
@@ -135,7 +148,7 @@ public:
             temp = CUDAImage::reverse(img._widht);
             cout << setfill('0') << setw(8) <<  temp  << " ";
             temp = CUDAImage::reverse(img._height);
-            cout << setfill('0') << setw(8) <<  temp  << endl;            
+            cout << setfill('0') << setw(8) <<  temp  << endl;
         }
         if(img._transpose){
             for(uint32_t i = 0; i < img._widht; ++i){
@@ -204,7 +217,7 @@ public:
         _widht = _height = 0;
     }
 
-    // 10000 
+    // 10000
     // make filration
     void cuda_filter_img(){
         // device data
@@ -254,7 +267,7 @@ public:
         sobel<<<blocks, threads>>>(d_data, _height, _widht);
         throw_on_cuda_error(cudaGetLastError());
 
-        
+
         throw_on_cuda_error(
             cudaMemcpy(
                 _data, d_data,
@@ -266,7 +279,7 @@ public:
         throw_on_cuda_error(cudaUnbindTexture(g_text));
         throw_on_cuda_error(cudaFree(d_data));
         throw_on_cuda_error(cudaFreeArray(a_data));
-        
+
     }
 
 
