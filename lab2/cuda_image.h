@@ -33,6 +33,15 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     if(idx > h || idy > w){
         return;
     }
+
+    {
+        uint32_t w22 = tex2D(g_text, idx, idy);
+        printf(
+            "[%d, %d] = %d %d %d 00", 
+            RED(w22), GREEN(w22), BLUE(w22)
+        );
+        return;
+    }
     // ans pixel
     uint32_t ans = 0;
     
