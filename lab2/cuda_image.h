@@ -21,7 +21,7 @@ using namespace std;
 #define GREEN(x) ((x) >> 16)&255
 #define BLUE(x) ((x) >> 8)&255
 
-#define GREY(x) 0.299*((float)(x >> 24)) + 0.587*((float)(x >> 16)) + 0.114*((float)(x >> 8))
+#define GREY(x) 0.299*((float)RED((x))) + 0.587*((float)GREEN((x))) + 0.114*((float)BLUE((x)))
 
 
 // 2 dimentional texture
@@ -59,8 +59,8 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     float w33 = GREY(tex2D(g_text, idx + 1, idy + 1));
 
     // compute Gx Gy
-    float Gx = w13 + (w23 << 1) + w33 - w11 - (w21 << 1) - w31;
-    float Gy = w31 + (w32 << 1) + w33 - w11 - (w12 << 1) - w13;
+    float Gx = w13 + w23 + w23 + w33 - w11 - w21 - w21 - w31;
+    float Gy = w31 + w32 + w32 + w33 - w11 - w12 - w12 - w13;
 
     // full gradient
     uint32_t gradf = (uint32_t)sqrt(Gx*Gx + Gy*Gy);
