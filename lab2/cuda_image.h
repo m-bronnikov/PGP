@@ -29,8 +29,8 @@ texture<uint32_t, 2, cudaReadModeElementType> g_text;
 
 // filter(variant #8)
 __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
-    uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    uint32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+    int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 
     if(idx >= h || idy >= w){
         return;
