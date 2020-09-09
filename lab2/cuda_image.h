@@ -273,11 +273,6 @@ public:
         uint32_t* d_data = nullptr;
         cudaArray* a_data = nullptr;
 
-        // use clamp optimisation for limit exits
-        g_text.addressMode[0] = cudaAddressModeClamp;
-        g_text.addressMode[1] = cudaAddressModeClamp;
-        g_text.normalized = false;
-
         // prepare data
 
         // out:
@@ -302,6 +297,11 @@ public:
         throw_on_cuda_error(
             cudaBindTextureToArray(g_text, a_data, cfDesc)
         );
+
+        // use clamp optimisation for limit exits
+        g_text.addressMode[0] = cudaAddressModeClamp;
+        g_text.addressMode[1] = cudaAddressModeClamp;
+        g_text.normalized = false;
 
         uint32_t bloks_x = _height / MAX_X;
         uint32_t bloks_y = _widht / MAX_Y;
