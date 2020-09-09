@@ -20,7 +20,8 @@ using namespace std;
 #define RED(x) ((x) >> 24)
 #define GREEN(x) ((x) >> 16)&255
 #define BLUE(x) ((x) >> 8)&255
-#define GREY(x) (0.299*((float) RED(x)) + 0.587*((float) GREEN(x)) + 0.114*((float) BLUE(x)))
+
+#define GREY(x) 0.299*((float) RED(x)) + 0.587*((float) GREEN(x)) + 0.114*((float) BLUE(x))
 
 
 // 2 dimentional texture
