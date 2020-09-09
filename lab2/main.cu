@@ -9,18 +9,17 @@ using namespace std;
 int main(){
     string path1, path2;
     CUDAImage img;
-    //cin >> path1 >> path2;
-    //ifstream fin(path1);
-    //ofstream fout(path2);
-    cin >> img;
+    cin >> path1 >> path2;
+    ifstream fin(path1);
+    ofstream fout(path2);
+    fin >> img;
     try{
         img.cuda_filter_img();
-        cout << img;
     }catch(std::runtime_error &exception){
         cout << "ERROR: " << exception.what() << endl;
         return 0;
     }
-    //cout << img;
+    fout << img;
 
     //fout.close();
     //fin.close();
