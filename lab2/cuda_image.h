@@ -32,7 +32,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if(idx >= h || idy >= w){
+    if(idx >= w || idy >= h){
         return;
     }
 
