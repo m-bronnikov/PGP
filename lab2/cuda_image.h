@@ -299,12 +299,14 @@ public:
         );
 
         // use clamp optimisation for limit exits
-        /*
+
         g_text.normalized = false;
 
         g_text.addressMode[0] = cudaAddressModeClamp;
         g_text.addressMode[1] = cudaAddressModeClamp;
-        */
+
+        cout << cudaAdressModeClamp << cudaAdressModeWrap << endl;
+
 
         uint32_t bloks_x = _height / MAX_X;
         uint32_t bloks_y = _widht / MAX_Y;
