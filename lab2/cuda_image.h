@@ -35,14 +35,56 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     if(idx >= h || idy >= w){
         return;
     }
-
-    {
+    if(!idx && !idy){
         uint32_t w22 = tex2D(g_text, idx, idy);
         printf(
             "[%d, %d] = %d %d %d 00\n", idx, idy,
             RED(w22), GREEN(w22), BLUE(w22)
         );
+
+        uint32_t w11 = tex2D(g_text, idx-1, idy-1);
+        printf(
+            "[%d, %d] = %d %d %d 00\n", idx-1, idy-1,
+            RED(w11), GREEN(w11), BLUE(w11)
+        );
+        uint32_t w12 = tex2D(g_text, idx-1, idy);
+        printf(
+            "[%d, %d] = %d %d %d 00\n", idx-1, idy,
+            RED(w12), GREEN(w12), BLUE(w12)
+        );
+        uint32_t w13 = tex2D(g_text, idx-1, idy+1);
+        printf(
+            "[%d, %d] = %d %d %d 00\n", idx-1, idy+1,
+            RED(w13), GREEN(w13), BLUE(w13)
+        );
+        uint32_t w21 = tex2D(g_text, idx, idy-1);
+        printf(
+            "[%d, %d] = %d %d %d 00\n", idx, idy-1,
+            RED(w21), GREEN(w21), BLUE(w21)
+        );
+
+        uint32_t w23 = tex2D(g_text, idx, idy+1);
+        printf(
+            "[%d, %d] = %d %d %d 00\n", idx, idy+1,
+            RED(w23), GREEN(w23), BLUE(w23)
+        );
+        uint32_t w31 = tex2D(g_text, idx+1, idy-1);
+        printf(
+            "[%d, %d] = %d %d %d 00\n", idx+1, idy-1,
+            RED(w31), GREEN(w31), BLUE(w31)
+        );
+        uint32_t w32 = tex2D(g_text, idx+1, idy);
+        printf(
+            "[%d, %d] = %d %d %d 00\n", idx+1, idy,
+            RED(w32), GREEN(w32), BLUE(w32)
+        );
+        uint32_t w33 = tex2D(g_text, idx+1, idy+1);
+        printf(
+            "[%d, %d] = %d %d %d 00\n", idx+1, idy+1,
+            RED(w33), GREEN(w33), BLUE(w33)
+        );
     }
+
     // ans pixel
     uint32_t ans = 0;
 
