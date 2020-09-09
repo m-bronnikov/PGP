@@ -62,6 +62,14 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     gradf = gradf > 255 ? 255 : gradf;
     ans ^= (gradf << 24);
 
+    {
+        uint32_t w22 = tex2D(g_text, idx, idy);
+        printf(
+            "RED[%d, %d] = %d 00\n", idx, idy,
+            gradf
+        );
+    }
+
     // green:
     G1 = GREEN(w13) + (GREEN(w23) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w21) << 1) - GREEN(w31); 
     G2 = GREEN(w31) + (GREEN(w32) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w12) << 1) - GREEN(w13);
