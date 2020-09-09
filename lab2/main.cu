@@ -21,7 +21,7 @@ int main(){
     }
     fout << img;
 
-    //fout.close();
-    //fin.close();
+    fout.close();
+    fin.close();
     return 0;
 }
