@@ -12,8 +12,6 @@ int main(){
 
     cin >> path1 >> path2;
 
-    cout << path1 << " " << path2 << endl;
-
     ifstream fin(path1);
     ofstream fout(path2);
 
