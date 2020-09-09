@@ -238,7 +238,7 @@ public:
         img._height = CUDAImage::reverse(temp);
         img._data = (uint32_t*) realloc(img._data, sizeof(uint32_t)*img._widht*img._height);
 
-        img._transpose = img._widht > img._height ? 0 : 1;
+        img._transpose = img._widht >= img._height ? 0 : 1;
 
         if(img._transpose){
             for(uint32_t i = 0; i < img._height; ++i){
