@@ -20,6 +20,7 @@ int main(){
         cout << "ERROR: " << exception.what() << endl;
         return 0;
     }
+    //cout << img;
 
     //fout.close();
     //fin.close();

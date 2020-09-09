@@ -68,6 +68,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     gradf = gradf > 255 ? 255 : gradf;
     ans ^= (gradf << 8);
 
+    // to global mem
     d_data[idx*w + idy] = ans;
 }
 
@@ -120,15 +121,26 @@ public:
             temp = CUDAImage::reverse(img._height);
             cout << setfill('0') << setw(8) <<  temp  << endl;            
         }
-
-        for(uint32_t i = 0; i < img._height; ++i){
-            for(uint32_t j = 0; j < img._widht; ++j){
-                if(j){
-                    cout << " ";
+        if(img._transpose){
+            for(uint32_t i = 0; i < img._widht; ++i){
+                for(uint32_t j = 0; j < img._height; ++j){
+                    if(j){
+                        cout << " ";
+                    }
+                    cout << setfill('0') << setw(8) << img._data[j*img._widht + i];
                 }
-                cout << setfill('0') << setw(8) << img._data[i*img._widht + j];
+                cout << endl;
             }
-            cout << endl;
+        }else{
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    if(j){
+                        cout << " ";
+                    }
+                    cout << setfill('0') << setw(8) << img._data[i*img._widht + j];
+                }
+                cout << endl;
+            }
         }
 
         os.unsetf(ios::hex);
