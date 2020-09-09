@@ -26,7 +26,7 @@ int main(){
         return 0;
     }
 
-    cout << img;
+    fout << img;
 
     fout.close();
     fin.close();
