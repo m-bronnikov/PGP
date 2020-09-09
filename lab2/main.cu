@@ -14,10 +14,8 @@ int main(){
 
     cout << path1 << " " << path2 << endl;
 
-    return 0;
     ifstream fin(path1);
     ofstream fout(path2);
-
 
     fin >> img;
 
