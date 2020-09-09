@@ -56,8 +56,8 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     uint32_t w33 = tex2D(g_text, idx + 1, idy + 1);
 
     // red:
-    uint32_t G1 = RED(w13) + (RED(w23) << 1) + RED(w33) - RED(w11) - (RED(w21) << 1) - RED(w31); 
-    uint32_t G2 = RED(w31) + (RED(w32) << 1) + RED(w33) - RED(w11) - (RED(w12) << 1) - RED(w13);
+    int32_t G1 = RED(w13) + (RED(w23) << 1) + RED(w33) - RED(w11) - (RED(w21) << 1) - RED(w31); 
+    int32_t G2 = RED(w31) + (RED(w32) << 1) + RED(w33) - RED(w11) - (RED(w12) << 1) - RED(w13);
     uint32_t gradf = sqrt((double)(G1*G1 + G2*G2));
     gradf = gradf > 255 ? 255 : gradf;
     ans ^= (gradf << 24);
