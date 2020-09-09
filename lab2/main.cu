@@ -11,7 +11,10 @@ int main(){
     CUDAImage img;
 
     cin >> path1 >> path2;
+
     cout << path1 << " " << path2 << endl;
+
+    return 0;
     ifstream fin(path1);
     ofstream fout(path2);
 
