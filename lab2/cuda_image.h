@@ -305,7 +305,7 @@ public:
         g_text.addressMode[0] = cudaAddressModeClamp;
         g_text.addressMode[1] = cudaAddressModeClamp;
 
-        cout << cudaAdressModeClamp << cudaAdressModeWrap << endl;
+        // cout << cudaAddressModeClamp << cudaAddressModeWrap << endl;
 
 
         uint32_t bloks_x = _height / MAX_X;
