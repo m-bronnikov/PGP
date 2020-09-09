@@ -35,55 +35,6 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     if(idx >= h || idy >= w){
         return;
     }
-    if((!idx && !idy) || (idx==2 && idy==2)){
-        uint32_t w22 = tex2D(g_text, idx, idy);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx, idy,
-            RED(w22), GREEN(w22), BLUE(w22)
-        );
-
-        uint32_t w11 = tex2D(g_text, idx-1, idy-1);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx-1, idy-1,
-            RED(w11), GREEN(w11), BLUE(w11)
-        );
-        uint32_t w12 = tex2D(g_text, idx-1, idy);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx-1, idy,
-            RED(w12), GREEN(w12), BLUE(w12)
-        );
-        uint32_t w13 = tex2D(g_text, idx-1, idy+1);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx-1, idy+1,
-            RED(w13), GREEN(w13), BLUE(w13)
-        );
-        uint32_t w21 = tex2D(g_text, idx, idy-1);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx, idy-1,
-            RED(w21), GREEN(w21), BLUE(w21)
-        );
-
-        uint32_t w23 = tex2D(g_text, idx, idy+1);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx, idy+1,
-            RED(w23), GREEN(w23), BLUE(w23)
-        );
-        uint32_t w31 = tex2D(g_text, idx+1, idy-1);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx+1, idy-1,
-            RED(w31), GREEN(w31), BLUE(w31)
-        );
-        uint32_t w32 = tex2D(g_text, idx+1, idy);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx+1, idy,
-            RED(w32), GREEN(w32), BLUE(w32)
-        );
-        uint32_t w33 = tex2D(g_text, idx+1, idy+1);
-        printf(
-            "[%d, %d] = %d %d %d 00\n", idx+1, idy+1,
-            RED(w33), GREEN(w33), BLUE(w33)
-        );
-    }
 
     // ans pixel
     uint32_t ans = 0;
@@ -114,40 +65,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     ans ^= (gradf << 8);
 
     // locate in global mem
-    d_data[idx*w + idy] = ans;
-    /*
-    // red:
-    int32_t G1 = RED(w13) + (RED(w23) << 1) + RED(w33) - RED(w11) - (RED(w21) << 1) - RED(w31);
-    int32_t G2 = RED(w31) + (RED(w32) << 1) + RED(w33) - RED(w11) - (RED(w12) << 1) - RED(w13);
-    uint32_t gradf = sqrt((double)(G1*G1 + G2*G2));
-    gradf = gradf > 255 ? 255 : gradf;
-    ans ^= (gradf << 24);
-
-    {
-        uint32_t w22 = tex2D(g_text, idx, idy);
-        printf(
-            "RED[%d, %d] = %d, G = [%d, %d]\n", idx, idy,
-            gradf, G1, G2
-        );
-    }
-
-    // green:
-    G1 = GREEN(w13) + (GREEN(w23) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w21) << 1) - GREEN(w31);
-    G2 = GREEN(w31) + (GREEN(w32) << 1) + GREEN(w33) - GREEN(w11) - (GREEN(w12) << 1) - GREEN(w13);
-    gradf = sqrt((double)(G1*G1 + G2*G2));
-    gradf = gradf > 255 ? 255 : gradf;
-    ans ^= (gradf << 16);
-
-    // blue:
-    G1 = BLUE(w13) + (BLUE(w23) << 1) + BLUE(w33) - BLUE(w11) - (BLUE(w21) << 1) - BLUE(w31);
-    G2 = BLUE(w31) + (BLUE(w32) << 1) + BLUE(w33) - BLUE(w11) - (BLUE(w12) << 1) - BLUE(w13);
-    gradf = sqrt((double)(G1*G1 + G2*G2));
-    gradf = gradf > 255 ? 255 : gradf;
-    ans ^= (gradf << 8);
-
-    // to global mem
-    d_data[idx*w + idy] = ans;
-    */
+    d_data[idy*w + idx] = ans;
 }
 
 // exceptions if error
@@ -199,6 +117,7 @@ public:
             temp = CUDAImage::reverse(img._height);
             cout << setfill('0') << setw(8) <<  temp  << endl;
         }
+
         if(img._transpose){
             for(uint32_t i = 0; i < img._widht; ++i){
                 for(uint32_t j = 0; j < img._height; ++j){
