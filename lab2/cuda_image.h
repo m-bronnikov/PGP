@@ -20,7 +20,7 @@ using namespace std;
 #define RED(x) ((x) >> 24)
 #define GREEN(x) ((x) >> 16)&255
 #define BLUE(x) ((x) >> 8)&255
-#define GREY(x) 0.299*((float) RED(x)) + 0.587*((float) GREEN(x)) + 0.114*((float) BLUE(x))
+#define GREY(x) (0.299*((float) RED(x)) + 0.587*((float) GREEN(x)) + 0.114*((float) BLUE(x)))
 
 
 // 2 dimentional texture
@@ -46,6 +46,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     uint32_t ans = 0;
 
     // locate area in mem(32 bite)
+    // compute grey scale for all pixels in area
     float w11 = GREY(tex2D(g_text, idx - 1, idy - 1));
     float w12 = GREY(tex2D(g_text, idx, idy - 1));
     float w13 = GREY(tex2D(g_text, idx + 1, idy - 1));
@@ -56,15 +57,20 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     float w32 = GREY(tex2D(g_text, idx, idy + 1));
     float w33 = GREY(tex2D(g_text, idx + 1, idy + 1));
 
-    float G1 = w13 + (w23 << 1) + w33 - w11 - (w21 << 1) - w31;
-    float G1 = w31 + (w32 << 1) + w33 - w11 - (w12 << 1) - w13;
+    // compute Gx Gy
+    float Gx = w13 + (w23 << 1) + w33 - w11 - (w21 << 1) - w31;
+    float Gy = w31 + (w32 << 1) + w33 - w11 - (w12 << 1) - w13;
 
-    uint32_t gradf = (uint32_t)sqrt(G1*G1 + G2*G2);
+    // full gradient
+    uint32_t gradf = (uint32_t)sqrt(Gx*Gx + Gy*Gy);
+    // max(grad, 255)
     gradf = gradf > 255 ? 255 : gradf;
+    // store values in variable for minimize work with global mem
     ans ^= (gradf << 24);
     ans ^= (gradf << 16);
     ans ^= (gradf << 8);
 
+    // locate in global mem
     d_data[idx*w + idy] = ans;
     /*
     // red:
