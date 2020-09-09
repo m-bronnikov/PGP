@@ -45,15 +45,15 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     uint32_t ans = 0;
     
     // locate area in mem(24 bite)
-    uint32_t w11 = tex2D(g_text, idx - 1, idy - 1);
-    uint32_t w12 = tex2D(g_text, idx, idy - 1);
-    uint32_t w13 = tex2D(g_text, idx + 1, idy - 1);
-    uint32_t w21 = tex2D(g_text, idx - 1, idy);
+    int32_t w11 = tex2D(g_text, idx - 1, idy - 1);
+    int32_t w12 = tex2D(g_text, idx, idy - 1);
+    int32_t w13 = tex2D(g_text, idx + 1, idy - 1);
+    int32_t w21 = tex2D(g_text, idx - 1, idy);
 
-    uint32_t w23 = tex2D(g_text, idx + 1, idy);
-    uint32_t w31 = tex2D(g_text, idx - 1, idy + 1);
-    uint32_t w32 = tex2D(g_text, idx, idy + 1);
-    uint32_t w33 = tex2D(g_text, idx + 1, idy + 1);
+    int32_t w23 = tex2D(g_text, idx + 1, idy);
+    int32_t w31 = tex2D(g_text, idx - 1, idy + 1);
+    int32_t w32 = tex2D(g_text, idx, idy + 1);
+    int32_t w33 = tex2D(g_text, idx + 1, idy + 1);
 
     // red:
     int32_t G1 = RED(w13) + (RED(w23) << 1) + RED(w33) - RED(w11) - (RED(w21) << 1) - RED(w31); 
