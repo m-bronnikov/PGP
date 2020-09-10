@@ -108,35 +108,35 @@ public:
 
         if(img._transpose){
             temp = CUDAImage::reverse(img._height);
-            cout << setfill('0') << setw(8) <<  temp  << " ";
+            os << setfill('0') << setw(8) <<  temp  << " ";
             temp = CUDAImage::reverse(img._widht);
-            cout << setfill('0') << setw(8) <<  temp  << endl;
+            os << setfill('0') << setw(8) <<  temp  << endl;
         }else{
             temp = CUDAImage::reverse(img._widht);
-            cout << setfill('0') << setw(8) <<  temp  << " ";
+            os << setfill('0') << setw(8) <<  temp  << " ";
             temp = CUDAImage::reverse(img._height);
-            cout << setfill('0') << setw(8) <<  temp  << endl;
+            os << setfill('0') << setw(8) <<  temp  << endl;
         }
 
         if(img._transpose){
             for(uint32_t i = 0; i < img._widht; ++i){
                 for(uint32_t j = 0; j < img._height; ++j){
                     if(j){
-                        cout << " ";
+                        os << " ";
                     }
-                    cout << setfill('0') << setw(8) << img._data[j*img._widht + i];
+                    os << setfill('0') << setw(8) << img._data[j*img._widht + i];
                 }
-                cout << endl;
+                os << endl;
             }
         }else{
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     if(j){
-                        cout << " ";
+                        os << " ";
                     }
-                    cout << setfill('0') << setw(8) << img._data[i*img._widht + j];
+                    os << setfill('0') << setw(8) << img._data[i*img._widht + j];
                 }
-                cout << endl;
+                os << endl;
             }
         }
 
@@ -151,9 +151,9 @@ public:
         is.setf(ios::hex);
 
         uint32_t temp;
-        cin >> temp;
+        is >> temp;
         img._widht = CUDAImage::reverse(temp);
-        cin >> temp;
+        is >> temp;
         img._height = CUDAImage::reverse(temp);
         img._data = (uint32_t*) realloc(img._data, sizeof(uint32_t)*img._widht*img._height);
 
@@ -162,14 +162,14 @@ public:
         if(img._transpose){
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
-                    cin >> img._data[i + img._height*j];
+                    is >> img._data[i + img._height*j];
                 }
             }
             std::swap(img._widht, img._height);
         }else{
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
-                    cin >> img._data[i*img._widht + j];
+                    is >> img._data[i*img._widht + j];
                 }
             }
         }
