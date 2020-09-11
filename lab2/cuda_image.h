@@ -37,6 +37,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     }
 
     if(idx == 2 && idy == 1){
+    printf("w=%d, h=%d\n", w, h);
     printf("[%d, %d] = %d\n", idx-1, idy-1, tex2D(g_text, idx - 1, idy - 1));
     printf("[%d, %d] = %d\n", idx, idy-1, tex2D(g_text, idx, idy - 1));
     printf("[%d, %d] = %d\n", idx+1, idy-1, tex2D(g_text, idx + 1, idy - 1));
