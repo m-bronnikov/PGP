@@ -22,7 +22,7 @@ int main(){
         img.cuda_filter_img();
     }catch(std::runtime_error &exception){
         cout << "ERROR: " << exception.what() << endl;
-        return 0;
+        //return 0;
     }
 
     fout << img;

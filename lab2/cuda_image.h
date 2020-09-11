@@ -14,14 +14,14 @@
 using namespace std;
 
 // max threads is 512 in block => sqrt(512) is dim
-#define MAX_X 22
-#define MAX_Y 22
+#define MAX_X 3
+#define MAX_Y 3
 
 #define RED(x) (x)&255
 #define GREEN(x) ((x) >> 8)&255
 #define BLUE(x) ((x) >> 16)&255
 
-#define __RELEASE__
+#define __DEBUG__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
@@ -37,20 +37,8 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     if(idx >= w || idy >= h){
         return;
     }
-
-    if(idx == 2 && idy == 1){
-    printf("w=%d, h=%d\n", w, h);
-    printf("[%d, %d] = %d\n", idx-1, idy-1, tex2D(g_text, idx - 1, idy - 1));
-    printf("[%d, %d] = %d\n", idx, idy-1, tex2D(g_text, idx, idy - 1));
-    printf("[%d, %d] = %d\n", idx+1, idy-1, tex2D(g_text, idx + 1, idy - 1));
-    printf("[%d, %d] = %d\n", idx-1, idy, tex2D(g_text, idx - 1, idy));
-    printf("[%d, %d] = %d\n", idx, idy, tex2D(g_text, idx, idy));
-    printf("[%d, %d] = %d\n", idx+1, idy, tex2D(g_text, idx + 1, idy ));
-    printf("[%d, %d] = %d\n", idx-1, idy+1, tex2D(g_text, idx - 1, idy + 1));
-    printf("[%d, %d] = %d\n", idx, idy+1, tex2D(g_text, idx, idy - 1));
-    printf("[%d, %d] = %d\n", idx+1, idy+1, tex2D(g_text, idx + 1, idy + 1));
-
-    }
+    printf("x = [%d %d]\n", blockIdx.x, blockDim.x);
+    printf("y = [%d %d]\n", blockIdx.y, blockDim.y);
 
     // ans pixel
     uint32_t ans = 0;
@@ -174,6 +162,7 @@ public:
         }
         #endif
         
+        #ifdef __RELEASE__
         if(img._transpose){
             for(uint32_t i = 0; i < img._widht; ++i){
                 for(uint32_t j = 0; j < img._height; ++j){
@@ -186,12 +175,15 @@ public:
                     os.write(reinterpret_cast<const char*>(&img._data[i*img._widht + j]), sizeof(uint32_t));
                 }
             }
-        }        
+        }   
+        #endif     
 
 
         #ifndef __RELEASE__
+
         os.unsetf(ios::hex);
         os.setf(ios::dec);
+
         #endif
 
         return os;
@@ -208,7 +200,7 @@ public:
         img._widht = CUDAImage::reverse(temp);
         is >> temp;
         img._height = CUDAImage::reverse(temp);
-        img._data = (uint32_t*) realloc(img._data, sizeof(uint32_t)*img._widht*img._height);
+
         #endif
 
         #ifdef __RELEASE__
@@ -216,6 +208,7 @@ public:
         is.read(reinterpret_cast<char*>(&img._height), sizeof(uint32_t));
         #endif
 
+        img._data = (uint32_t*) realloc(img._data, sizeof(uint32_t)*img._widht*img._height);
         img._transpose = img._widht >= img._height ? 0 : 1;
 
         #ifndef __RELEASE__
@@ -223,7 +216,7 @@ public:
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     is >> img._data[i + img._height*j];
-                    img._data[i + img._height*j] = revere(img._data[i + img._height*j]);
+                    img._data[i + img._height*j] = reverse(img._data[i + img._height*j]);
                 }
             }
             std::swap(img._widht, img._height);
@@ -231,13 +224,14 @@ public:
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     is >> img._data[i*img._widht + j];
-                    img._data[j + img._width*i] = revere(img._data[j + img._width*i]);
+                    img._data[j + img._widht*i] = reverse(img._data[j + img._widht*i]);
                 }
             }
         }
 
         is.unsetf(ios::hex);
         is.setf(ios::dec);
+
         #endif
 
         #ifdef __RELEASE__
@@ -303,8 +297,8 @@ public:
 
         g_text.normalized = false;
 
-        g_text.addressMode[0] = cudaAddressModeMirror;
-        g_text.addressMode[1] = cudaAddressModeMirror;
+        g_text.addressMode[0] = cudaAddressModeClamp;
+        g_text.addressMode[1] = cudaAddressModeClamp;
         // cout << cudaAddressModeClamp << cudaAddressModeWrap << endl;
 
 
