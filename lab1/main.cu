@@ -5,7 +5,7 @@
 using namespace std;
 
 int main(){
-    int n;
+    size_t n;
     cin >> n;
 
     CUDAvector<double> left(n), right(n);

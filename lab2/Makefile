@@ -1,7 +1,6 @@
-all: main
-
-main: main.cu 
-	nvcc --std=c++11 -Werror cross-execution-space-call -lm main.cu -o lab2
-
-clean:
-	rm -rf lab2
+CC = nvcc
+CFLAGS = -Werror cross-execution-space-call -lm 
+SOURSES = main.cu
+BIN = lab2
+all:
+	$(CC) $(CFLAGS) -o $(BIN) $(SOURSES)
