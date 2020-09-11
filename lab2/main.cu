@@ -6,6 +6,7 @@
 
 using namespace std;
 
+
 int main(){
     string path1, path2;
     CUDAImage img;
