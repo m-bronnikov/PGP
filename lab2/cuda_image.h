@@ -36,6 +36,19 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
         return;
     }
 
+    if(idx == 1 && idy == 2){
+    printf("[%d, %d] = %d", idx-1, idy-1, tex2D(g_text, idx - 1, idy - 1));
+    printf("[%d, %d] = %d", idx, idy-1, tex2D(g_text, idx, idy - 1));
+    printf("[%d, %d] = %d", idx+1, idy-1, tex2D(g_text, idx + 1, idy - 1));
+    printf("[%d, %d] = %d", idx-1, idy, tex2D(g_text, idx - 1, idy));
+    printf("[%d, %d] = %d", idx, idy, tex2D(g_text, idx, idy));
+    printf("[%d, %d] = %d", idx+1, idy, tex2D(g_text, idx + 1, idy ));
+    printf("[%d, %d] = %d", idx-1, idy+1, tex2D(g_text, idx - 1, idy + 1));
+    printf("[%d, %d] = %d", idx, idy+1, tex2D(g_text, idx, idy - 1));
+    printf("[%d, %d] = %d", idx+1, idy+1, tex2D(g_text, idx + 1, idy + 1));
+
+    }
+
     // ans pixel
     uint32_t ans = 0;
 
@@ -56,8 +69,9 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     float Gy = w31 + w32 + w32 + w33 - w11 - w12 - w12 - w13;
 
     // full gradient
-    uint32_t gradf = (uint32_t)sqrt(Gx*Gx + Gy*Gy);
+    int32_t gradf = (int32_t)sqrt(Gx*Gx + Gy*Gy);
     // max(grad, 255)
+    
     gradf = gradf > 255 ? 255 : gradf;
     // store values in variable for minimize work with global mem
     ans ^= (gradf << 24);
