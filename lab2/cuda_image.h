@@ -310,7 +310,7 @@ public:
         bloks_y += bloks_y * MAX_Y < _widht ? 1 : 0;
 
         dim3 threads = dim3(MAX_X, MAX_Y);
-        dim3 blocks = dim3(bloks_x, bloks_y);
+        dim3 blocks = dim3(bloks_y, bloks_x);
 
         // run filter
         sobel<<<blocks, threads>>>(d_data, _height, _widht);
