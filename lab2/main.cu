@@ -13,8 +13,8 @@ int main(){
 
     cin >> path1 >> path2;
 
-    ifstream fin(path1);
-    ofstream fout(path2);
+    ifstream fin(path1, ios::in | ios::binary);
+    ofstream fout(path2, ios::out | ios::binary);
 
     fin >> img;
 

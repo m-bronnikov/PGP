@@ -17,11 +17,13 @@ using namespace std;
 #define MAX_X 22
 #define MAX_Y 22
 
-#define RED(x) ((x) >> 24)
-#define GREEN(x) ((x) >> 16)&255
-#define BLUE(x) ((x) >> 8)&255
+#define RED(x) (x)&255
+#define GREEN(x) ((x) >> 8)&255
+#define BLUE(x) ((x) >> 16)&255
 
-#define GREY(x) 0.299*((float)((x)>>24)) + 0.587*((float)(((x)>>16)&255)) + 0.114*((float)(((x)>>8)&255))
+#define __RELEASE__
+
+#define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
 
 // 2 dimentional texture
@@ -93,16 +95,18 @@ void throw_on_cuda_error(cudaError_t code)
 }
 
 
+
+
 // Image
 class CUDAImage{
 public:
     CUDAImage() : _data(nullptr), _widht(0), _height(0){}
 
     CUDAImage(const string& path) : CUDAImage(){
-        ifstream fin(path);
+        ifstream fin(path, ios::in | ios::binary);
         if(!fin.is_open()){
             cout << "ERROR" << endl;
-            exit(0);
+            throw std::runtime_error("cant open file!");
         }
 
         fin >> (*this);
@@ -117,10 +121,12 @@ public:
 
     // out is not parallel because order is important
     friend ostream& operator<<(ostream& os, const CUDAImage& img){
-        os.unsetf(ios::dec);
-        os.setf(ios::hex | ios::uppercase);
-        uint32_t temp;
 
+
+        #ifndef __RELEASE__
+        uint32_t temp;
+        os.unsetf(ios::dec);
+        os.setf(ios::hex);
         if(img._transpose){
             temp = CUDAImage::reverse(img._height);
             os << setfill('0') << setw(8) <<  temp  << " ";
@@ -132,14 +138,26 @@ public:
             temp = CUDAImage::reverse(img._height);
             os << setfill('0') << setw(8) <<  temp  << endl;
         }
+        #endif
 
+        #ifdef __RELEASE__
+        if(img._transpose){
+            os.write(reinterpret_cast<const char*>(&img._height), sizeof(uint32_t));
+            os.write(reinterpret_cast<const char*>(&img._widht), sizeof(uint32_t));
+        }else{
+            os.write(reinterpret_cast<const char*>(&img._widht), sizeof(uint32_t));
+            os.write(reinterpret_cast<const char*>(&img._height), sizeof(uint32_t));
+        }
+        #endif
+
+        #ifndef __RELEASE__
         if(img._transpose){
             for(uint32_t i = 0; i < img._widht; ++i){
                 for(uint32_t j = 0; j < img._height; ++j){
                     if(j){
                         os << " ";
                     }
-                    os << setfill('0') << setw(8) << img._data[j*img._widht + i];
+                    os << setfill('0') << setw(8) << reverse(img._data[j*img._widht + i]);
                 }
                 os << endl;
             }
@@ -149,19 +167,39 @@ public:
                     if(j){
                         os << " ";
                     }
-                    os << setfill('0') << setw(8) << img._data[i*img._widht + j];
+                    os << setfill('0') << setw(8) << reverse(img._data[i*img._widht + j]);
                 }
                 os << endl;
             }
         }
+        #endif
+        
+        if(img._transpose){
+            for(uint32_t i = 0; i < img._widht; ++i){
+                for(uint32_t j = 0; j < img._height; ++j){
+                    os.write(reinterpret_cast<const char*>(&img._data[j*img._widht + i]), sizeof(uint32_t));
+                }
+            }
+        }else{
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    os.write(reinterpret_cast<const char*>(&img._data[i*img._widht + j]), sizeof(uint32_t));
+                }
+            }
+        }        
 
+
+        #ifndef __RELEASE__
         os.unsetf(ios::hex);
         os.setf(ios::dec);
+        #endif
+
         return os;
     }
 
 
     friend istream& operator>>(istream& is, CUDAImage& img){
+        #ifndef __RELEASE__
         is.unsetf(ios::dec);
         is.setf(ios::hex);
 
@@ -171,13 +209,21 @@ public:
         is >> temp;
         img._height = CUDAImage::reverse(temp);
         img._data = (uint32_t*) realloc(img._data, sizeof(uint32_t)*img._widht*img._height);
+        #endif
+
+        #ifdef __RELEASE__
+        is.read(reinterpret_cast<char*>(&img._widht), sizeof(uint32_t));
+        is.read(reinterpret_cast<char*>(&img._height), sizeof(uint32_t));
+        #endif
 
         img._transpose = img._widht >= img._height ? 0 : 1;
 
+        #ifndef __RELEASE__
         if(img._transpose){
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     is >> img._data[i + img._height*j];
+                    img._data[i + img._height*j] = revere(img._data[i + img._height*j]);
                 }
             }
             std::swap(img._widht, img._height);
@@ -185,12 +231,33 @@ public:
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     is >> img._data[i*img._widht + j];
+                    img._data[j + img._width*i] = revere(img._data[j + img._width*i]);
                 }
             }
         }
 
         is.unsetf(ios::hex);
         is.setf(ios::dec);
+        #endif
+
+        #ifdef __RELEASE__
+
+        if(img._transpose){
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    is.read(reinterpret_cast<char*>(&img._data[i + img._height*j]), sizeof(uint32_t));
+                }
+            }
+            std::swap(img._widht, img._height);
+        }else{
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    is.read(reinterpret_cast<char*>(&img._data[i*img._widht + j]), sizeof(uint32_t));
+                }
+            }
+        }
+
+        #endif 
         return is;
     }
 
