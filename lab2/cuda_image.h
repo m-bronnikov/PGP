@@ -14,8 +14,8 @@
 using namespace std;
 
 // max threads is 512 in block => sqrt(512) is dim
-#define MAX_X 3
-#define MAX_Y 3
+#define MAX_X 22
+#define MAX_Y 22
 
 #define RED(x) (x)&255
 #define GREEN(x) ((x) >> 8)&255
@@ -34,11 +34,14 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-    printf("x = [%d %d], y = [%d, %d]\n", blockIdx.x, threadIdx.x, blockIdx.y, threadIdx.y);
+    //printf("x = [%d %d], y = [%d, %d]\n", blockIdx.x, threadIdx.x, blockIdx.y, threadIdx.y);
 
     if(idx >= w || idy >= h){
         return;
     }
+
+    printf("x = [%d %d], y = [%d, %d]\n", blockIdx.x, threadIdx.x, blockIdx.y, threadIdx.y);
+
 
     // ans pixel
     uint32_t ans = 0;
