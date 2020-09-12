@@ -1,5 +1,5 @@
 CC = nvcc
-CFLAGS = -Werror cross-execution-space-call -lm 
+CFLAGS = -std=c++11 -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES -D__STRICT_ANSI__ -Werror cross-execution-space-call -lm 
 SOURSES = main.cu
 BIN = lab2
 all:
