@@ -14,14 +14,14 @@
 using namespace std;
 
 // max threads is 512 in block => sqrt(512) is dim
-#define MAX_X 2
-#define MAX_Y 2
+#define MAX_X 22
+#define MAX_Y 22
 
 #define RED(x) (x)&255
 #define GREEN(x) ((x) >> 8)&255
 #define BLUE(x) ((x) >> 16)&255
 
-#define __DEBUG__
+#define __RELEASE__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
@@ -40,7 +40,7 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
         return;
     }
 
-    printf("x = [%d %d], y = [%d, %d]\n", blockIdx.x, threadIdx.x, blockIdx.y, threadIdx.y);
+    //printf("x = [%d %d], y = [%d, %d]\n", blockIdx.x, threadIdx.x, blockIdx.y, threadIdx.y);
 
 
     // ans pixel
@@ -68,9 +68,9 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     
     gradf = gradf > 255 ? 255 : gradf;
     // store values in variable for minimize work with global mem
-    ans ^= (gradf << 24);
     ans ^= (gradf << 16);
     ans ^= (gradf << 8);
+    ans ^= (gradf);
 
     // locate in global mem
     d_data[idy*w + idx] = ans;
