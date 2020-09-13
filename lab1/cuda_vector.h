@@ -12,7 +12,7 @@
 using namespace std;
 
 #define  MAXDELTA 10000
-#define MAXPTHS 512
+#define MAXPTHS 1024
 
 #define __DEBUG__
 
@@ -144,7 +144,7 @@ public:
         // title
         log << "GPU threads: " << MAXPTHS << endl;
         // size:
-        log << ans._data << endl;
+        log << ans._size << endl;
         // time:
         log << gpu_time << endl;
         log.close();

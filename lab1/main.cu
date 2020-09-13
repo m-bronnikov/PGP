@@ -21,8 +21,9 @@ int main(){
 
     // main func (4 variant)
     min2(left, right, ans);
-
+    #ifndef __DEBUG__
     cout << ans << endl;
+    #endif
 
     return 0;
 }
