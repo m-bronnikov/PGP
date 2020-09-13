@@ -7,11 +7,14 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fstream>
 
 using namespace std;
 
 #define  MAXDELTA 10000
 #define MAXPTHS 512
+
+#define __DEBUG__
 
 template<typename T>
 __global__ void elem_min(T* d_left, T* d_right, T* d_ans, int size){
@@ -121,7 +124,32 @@ public:
         int blocks = ans._size / MAXPTHS;
         int plus_one = (ans._size == MAXPTHS * blocks) ? 0 : 1;
 
+        #ifdef __DEBUG__
+        cudaEvent_t start, stop;
+        float gpu_time = 0.0;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+        #endif
+
         elem_min<<<blocks + plus_one, MAXPTHS>>>(d_left, d_right, d_ans, ans._size);
+
+        #ifdef __DEBUG__
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&gpu_time, start, stop);
+
+        // open log:
+        ofstream log("logs.log", ios::app);
+        // title
+        log << "GPU threads: " << MAXPTHS << endl;
+        // size:
+        log << ans._data << endl;
+        // time:
+        log << gpu_time << endl;
+        log.close();
+        #endif
+
 
         cudaError_t err = cudaGetLastError();
         // check errors
