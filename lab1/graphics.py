@@ -4,7 +4,7 @@ PATH = "logs.log"
 
 modes = {}
 
-with open(path, 'r') as fin:
+with open(PATH, 'r') as fin:
     while True:
         title = fin.readline()
         if not title:
@@ -25,7 +25,11 @@ for key in modes.keys():
     pair = modes[key]
     plt.plot(pair[0], pair[1], label=key)
 
+
 plt.grid()
+plt.xlabel("Размер вектора")
+plt.ylabel("Время, мс")
+
 plt.legend()
 plt.show()
 
