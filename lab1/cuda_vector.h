@@ -12,7 +12,7 @@
 using namespace std;
 
 #define  MAXDELTA 10000
-#define MAXPTHS 1024
+#define MAXPTHS 1
 
 #define __DEBUG__
 

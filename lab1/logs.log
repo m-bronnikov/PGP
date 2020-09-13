@@ -1,108 +1,177 @@
+GPU threads: 1024
+1
+0.023424
+GPU threads: 1024
+5
+0.023872
+GPU threads: 1024
+10
+0.023936
+GPU threads: 1024
+80
+0.022624
+GPU threads: 1024
+120
+0.02368
+GPU threads: 1024
+300
+0.023744
+GPU threads: 1024
+500
+0.024128
+GPU threads: 1024
+1024
+0.02336
+GPU threads: 1024
+1300
+0.023872
+GPU threads: 512
+1
+0.023136
+GPU threads: 512
+5
+0.023424
+GPU threads: 512
+10
+0.024576
+GPU threads: 512
+50
+0.02368
+GPU threads: 512
+80
+0.02368
+GPU threads: 512
+120
+0.022528
+GPU threads: 512
+300
+0.023616
+GPU threads: 512
+500
+0.023872
+GPU threads: 512
+1024
+0.022592
+GPU threads: 512
+1300
+0.022464
+GPU threads: 256
+1
+0.023456
+GPU threads: 256
+5
+0.024288
+GPU threads: 256
+10
+0.024608
+GPU threads: 256
+50
+0.023136
+GPU threads: 256
+80
+0.023008
+GPU threads: 256
+120
+0.023328
+GPU threads: 256
+300
+0.022624
+GPU threads: 256
+500
+0.024352
+GPU threads: 256
+1024
+0.022624
+GPU threads: 256
+1300
+0.022528
+GPU threads: 32
+1
+0.023648
+GPU threads: 32
+5
+0.023968
+GPU threads: 32
+10
+0.023808
+GPU threads: 32
+50
+0.024192
+GPU threads: 32
+80
+0.023296
+GPU threads: 32
+120
+0.02352
+GPU threads: 32
+300
+0.024096
+GPU threads: 32
+500
+0.024448
+GPU threads: 32
+1024
+0.023584
+GPU threads: 32
+1300
+0.023872
 GPU threads: 1
-100
-0.024992
+1
+0.022912
 GPU threads: 1
-1000
+5
+0.023488
+GPU threads: 1
+10
+0.024064
+GPU threads: 1
+50
+0.024576
+GPU threads: 1
+80
+0.024608
+GPU threads: 1
+120
+0.02608
+GPU threads: 1
+300
+0.03072
+GPU threads: 1
+500
+0.034752
+GPU threads: 1
+1024
 0.046848
 GPU threads: 1
-10000
-0.322432
-GPU threads: 1
-50000
-1.54288
-GPU threads: 256
-100
-0.022528
-GPU threads: 256
-1000
-0.02256
-GPU threads: 256
-10000
-0.021952
-GPU threads: 256
-50000
-0.045088
-GPU threads: 256
-100000
-0.07936
-GPU threads: 256
-500000
-0.354496
-GPU threads: 256
-2000000
-1.38906
-GPU threads: 256
-10000000
-6.9048
-GPU threads: 512
-100
-0.023008
-GPU threads: 512
-1000
-0.023488
-GPU threads: 512
-10000
-0.021888
-GPU threads: 512
-50000
-0.045056
-GPU threads: 512
-100000
-0.079584
-GPU threads: 512
-500000
-0.35456
-GPU threads: 512
-2000000
-1.3921
-GPU threads: 512
-10000000
-6.92176
-GPU threads: 1024
-100
-0.022272
-GPU threads: 1024
-1000
-0.024608
-GPU threads: 1024
-10000
-0.025952
-GPU threads: 1024
-50000
-0.05088
-GPU threads: 1024
-100000
-0.089376
-GPU threads: 1024
-500000
-0.400768
-GPU threads: 1024
-2000000
-1.60656
-GPU threads: 1024
-10000000
-7.8672
+1300
+0.053056
 CPU
-100
+1
+0
+CPU
+5
+0
+CPU
+10
+0
+CPU
+50
+0.002
+CPU
+80
+0.003
+CPU
+120
 0.004
 CPU
-1000
+300
+0.012
+CPU
+500
+0.019
+CPU
+1024
 0.039
 CPU
-10000
-0.376
-CPU
-50000
-1.323
-CPU
-100000
-2.099
-CPU
-500000
-7.882
-CPU
-2000000
-31.636
-CPU
-10000000
-158.166
+1300
+0.049
