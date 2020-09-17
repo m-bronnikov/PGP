@@ -22,6 +22,7 @@ using namespace std;
 #define BLUE(x) ((x) >> 16)&255
 
 #define __RELEASE__
+#define __TIME_COUNT__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
@@ -310,10 +311,36 @@ public:
         dim3 threads = dim3(MAX_X, MAX_Y);
         dim3 blocks = dim3(bloks_y, bloks_x);
 
-        // run filter
-        sobel<<<blocks, threads>>>(d_data, _height, _widht);
-        throw_on_cuda_error(cudaGetLastError());
 
+        #ifdef __TIME_COUNT__
+        cudaEvent_t start, stop;
+        float gpu_time = 0.0;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+        #endif
+
+	sobel<<<blocks, threads>>>(d_data, _height, _widht);
+	throw_on_cuda_error(cudaGetLastError());
+
+
+        #ifdef __TIME_COUNT__
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&gpu_time, start, stop);
+
+        // open log:
+        ofstream log("logs.log", ios::app);
+        // title
+        log << "GPU threads: " << MAX_X * MAX_Y << endl;
+        // size:
+        log << _height << " " << _widht << endl;
+        // time:
+        log << gpu_time << endl;
+        log.close();
+        #endif
+        // run filter
+        
 
         throw_on_cuda_error(
             cudaMemcpy(
