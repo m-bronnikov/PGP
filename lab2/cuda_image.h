@@ -14,8 +14,8 @@
 using namespace std;
 
 // max threads is 512 in block => sqrt(512) is dim
-#define MAX_X 16
-#define MAX_Y 16
+#define MAX_X 22
+#define MAX_Y 22
 
 #define RED(x) (x)&255
 #define GREEN(x) ((x) >> 8)&255
