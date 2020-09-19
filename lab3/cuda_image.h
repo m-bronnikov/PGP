@@ -634,7 +634,7 @@ private:
     static void back_matrix(double* matr){
         double A11 = matr[4]*matr[8] - matr[5]*matr[7];
         double A12 = matr[3]*matr[8] - matr[5]*matr[6];
-        double A13 = matr[4]*matr[7] - matr[4]*matr[6];
+        double A13 = matr[3]*matr[7] - matr[4]*matr[6];
  
         double A21 = matr[1]*matr[8] - matr[2]*matr[7];
         double A22 = matr[0]*matr[8] - matr[2]*matr[6];
