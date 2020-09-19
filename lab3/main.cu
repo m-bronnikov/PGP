@@ -21,7 +21,7 @@ int main(){
     for(uint32_t i = 0; i < points.size(); ++i){
         uint32_t nums;
         cin >> nums;
-        for(uint32_t j = 0; j < points.size(); ++j){
+        for(uint32_t j = 0; nums; ++j){
             uint32_t n1;
             cin >> n1;
             points[i].push_back(n1);
