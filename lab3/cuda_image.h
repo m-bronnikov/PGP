@@ -23,6 +23,8 @@ using namespace std;
 #define RED(x) (x)&255
 #define GREEN(x) ((x) >> 8)&255
 #define BLUE(x) ((x) >> 16)&255
+#define ALPHA(x) ((x) >> 24)&255
+
 
 #define MAX_CLASS_NUMBERS 32
 
@@ -120,6 +122,9 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             uint8_t ans_c = 0;
 
             uint32_t pixel = picture[i*h + j];
+            ans_c = ALPHA(pixel);
+            // make alpha chanel is zero if it was != 0
+            pixel ^= ((uint32_t) ans_c) << 24;
 
             for(uint8_t c = 0; c < classes; ++c){
                 float red = RED(pixel);
@@ -153,7 +158,8 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             }
 
             // set pixel alpha chanel
-            picture[i*h + j] ^= (ans_c << 24);
+            pixel ^= (ans_c << 24);
+            picture[i*h + j] = pixel;
         }
     }
 }
@@ -489,9 +495,9 @@ public:
         // open log:
         ofstream log("logs.log", ios::app);
         // title
-        log << "GPU threads: " << MAXPTHS << endl;
+        log  << BLOCKS_X * BLOCKS_Y * MAX_X * MAX_Y << endl;
         // size:
-        log << ans._size << endl;
+        log << _widht * _height << endl;
         // time:
         log << gpu_time << endl;
         log.close();
@@ -535,7 +541,12 @@ private:
 
             // compute  avg
             for(int j = 0; j < indexes[i].size(); j += 2){
-                uint32_t pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
+                uint32_t pixel = 0;
+                if(_transpose){
+                    pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
+                }else{
+                    pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
+                }
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
                 avg_blue += (double) (BLUE(pixel)); 
@@ -568,7 +579,12 @@ private:
 
             // compute cov
             for(int j = 0; j < indexes[i].size(); j+=2){
-                uint32_t pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
+                uint32_t pixel = 0;
+                if(_transpose){
+                    pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
+                }else{
+                    pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
+                }
                 double first = (double) (RED(pixel));
                 first -= avg_red; 
                 double second = (double) (GREEN(pixel));
