@@ -539,8 +539,14 @@ private:
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
                 avg_blue += (double) (BLUE(pixel)); 
-                cout << "[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
+                cout << "r[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
                 cout << (RED(pixel));
+                cout << endl;
+                cout << "g[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
+                cout << (GREEN(pixel));
+                cout << endl;
+                cout << "b[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
+                cout << (BLUE(pixel));
                 cout << endl;
             }
             
