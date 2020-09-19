@@ -149,7 +149,7 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
                     min = metric;
                 }
 
-                printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
+                // printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
             }
 
             // set pixel alpha chanel
@@ -538,7 +538,10 @@ private:
                 uint32_t pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
-                avg_blue += (double) (BLUE(pixel));  
+                avg_blue += (double) (BLUE(pixel)); 
+                cout << "[" <<  _data[indexes[i][j+1] << ", " << _data[indexes[i][j+1] << "] = ";
+                cout << (RED(pixel));
+                cout << endl;
             }
             
             avg_red /= size;
