@@ -528,7 +528,7 @@ private:
             double avg_blue = 0.0;
 
             double cov[9];
-            memset(cov, 0, sizeof(double)*9)
+            memset(cov, 0, sizeof(double)*9);
             
             // npj
             uint32_t size = indexes[i].size() >> 1;
