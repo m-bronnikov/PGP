@@ -539,6 +539,7 @@ private:
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
                 avg_blue += (double) (BLUE(pixel)); 
+                /*
                 cout << "r[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
                 cout << (RED(pixel));
                 cout << endl;
@@ -548,14 +549,17 @@ private:
                 cout << "b[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
                 cout << (BLUE(pixel));
                 cout << endl;
+                */
             }
             
             avg_red /= size;
             avg_green /= size;
             avg_blue /= size;
 
+            /*
             cout << "Class #" << i << " ";
             cout << avg_red << " " << avg_green << " " << avg_blue << endl;
+            */
 
             cov_avg[i].avg_red = (float) avg_red;
             cov_avg[i].avg_green = (float) avg_green;
@@ -611,10 +615,11 @@ private:
             cov_avg[i].cov31 = (float) cov[6];
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
-
+            /*
             cout << cov[0] << " " << cov[1] << " " << cov[2] << endl;
             cout << cov[3] << " " << cov[4] << " " << cov[5] << endl;
             cout << cov[6] << " " << cov[7] << " " << cov[8] << endl;
+            */
 
 
             // compute log modulo:
