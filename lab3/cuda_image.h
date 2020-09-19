@@ -528,6 +528,9 @@ private:
             double avg_blue = 0.0;
 
             double cov[9];
+            
+            // npj
+            uint32_t size = indexes[i].size() >> 1;
 
             // compute  avg
             for(int j = 0; j < indexes[i].size(); j += 2){
@@ -537,9 +540,9 @@ private:
                 avg_blue += (double) (BLUE(pixel));  
             }
             
-            avg_red /= 2.0 * indexes[i].size();
-            avg_green /= 2.0 * indexes[i].size();
-            avg_blue /= 2.0 * indexes[i].size();
+            avg_red /= size;
+            avg_green /= size;
+            avg_blue /= size;
 
             cov_avg[i].avg_red = (float) avg_red;
             cov_avg[i].avg_green = (float) avg_green;
@@ -568,6 +571,18 @@ private:
                 cov[7] += third*second; // 32
                 cov[8] += third*third; // 33
             }
+
+            cov[0] /= size - 1;
+            cov[1] /= size - 1;
+            cov[2] /= size - 1;
+
+            cov[3] /= size - 1;
+            cov[4] /= size - 1;
+            cov[5] /= size - 1;
+
+            cov[6] /= size - 1;
+            cov[7] /= size - 1;
+            cov[8] /= size - 1;
 
             // compute back:
             back_matrix(cov);
