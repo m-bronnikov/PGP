@@ -2,8 +2,8 @@
 #include <iomanip>
 #include <fstream>
 #include <string>
+#include <vector>
 #include "cuda_image.h"
-#include "cuda_vector.h"
 
 using namespace std;
 
@@ -16,7 +16,7 @@ int main(){
     cin >> path1 >> path2;
     cin >> size;
 
-    CUDAvector<CUDAvector<uint32_t>> points(size);
+    vector<vector<uint32_t>> points(size);
 
     for(uint32_t i = 0; i < points.size(); ++i){
         uint32_t nums;

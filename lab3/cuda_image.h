@@ -10,7 +10,7 @@
 #include <string>
 #include <fstream>
 #include <algorithm>
-#include "cuda_vector.h"
+#include <vector>
 
 using namespace std;
 
@@ -451,7 +451,7 @@ public:
     }
 
 
-    void cuda_classify_pixels(const CUDAvector<CUDAvector<uint32_t>>& indexes){
+    void cuda_classify_pixels(const vector<vector<uint32_t>>& indexes){
         class_data cov_avg[MAX_CLASS_NUMBERS];
 
         // memset(cov_avg, 0, sizeof(class_data));
@@ -526,7 +526,7 @@ private:
         return ans;
     }
 
-    void compute_conv_avg(class_data* cov_avg, const CUDAvector<CUDAvector<uint32_t>>& indexes){
+    void compute_conv_avg(class_data* cov_avg, const vector<vector<uint32_t>>& indexes){
         // for all classes
         for(uint32_t i = 0; i < indexes.size(); ++i){
             double avg_red = 0.0;
