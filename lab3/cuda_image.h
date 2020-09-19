@@ -612,9 +612,9 @@ private:
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
 
-            cout << cov[0] << " " << cov[1] << " " << cov[2] << " ";
-            cout << cov[3] << " " << cov[4] << " " << cov[5] << " ";
-            cout << cov[6] << " " << cov[7] << " " << cov[8];
+            cout << cov[0] << " " << cov[1] << " " << cov[2] << endl;
+            cout << cov[3] << " " << cov[4] << " " << cov[5] << endl;
+            cout << cov[6] << " " << cov[7] << " " << cov[8] << endl;
 
 
             // compute log modulo:
@@ -647,17 +647,16 @@ private:
         double D = A11 * matr[0] - A12 * matr[1] + A13 * matr[2];
 
         matr[0] = A11 / D;
-        matr[1] = A12 / D;
-        matr[2] = A13 / D;
+        matr[1] = A21 / D;
+        matr[2] = A31 / D;
         
-        matr[3] = A21 / D;
+        matr[3] = A12 / D;
         matr[4] = A22 / D;
-        matr[5] = A23 / D;
+        matr[5] = A32 / D;
 
-        matr[6] = A31 / D;
-        matr[7] = A32 / D;
+        matr[6] = A13 / D;
+        matr[7] = A23 / D;
         matr[8] = A33 / D;
-
     }
 
     uint32_t* _data;
