@@ -5,27 +5,36 @@
 #include <iostream>
 #include <iomanip>
 #include <string.h>
-#include <stdio.h>
+#include <cmath>
 #include <stdlib.h>
 #include <string>
 #include <fstream>
 #include <algorithm>
+#include "cuda_vector.h"
 
 using namespace std;
 
 // max threads is 512 in block => sqrt(512) is dim
-#define MAX_X 22
-#define MAX_Y 22
+#define MAX_X 16
+#define MAX_Y 16
+#define BLOCKS_X 32
+#define BLOCKS_Y 32
 
-#define RED(x) ((x) >> 24)
-#define GREEN(x) ((x) >> 16)&255
-#define BLUE(x) ((x) >> 8)&255
+#define RED(x) (x)&255
+#define GREEN(x) ((x) >> 8)&255
+#define BLUE(x) ((x) >> 16)&255
 
-#define GREY(x) 0.299*((float)((x)>>24)) + 0.587*((float)(((x)>>16)&255)) + 0.114*((float)(((x)>>8)&255))
+#define MAX_CLASS_NUMBERS 32
+
+#define __RELEASE__
+#define __NOT_TIME_COUNT__
+
+#define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
 
 // 2 dimentional texture
 texture<uint32_t, 2, cudaReadModeElementType> g_text;
+
 
 // filter(variant #8)
 __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
@@ -56,20 +65,101 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     float Gy = w31 + w32 + w32 + w33 - w11 - w12 - w12 - w13;
 
     // full gradient
-    uint32_t gradf = (uint32_t)sqrt(Gx*Gx + Gy*Gy);
+    int32_t gradf = (int32_t)sqrt(Gx*Gx + Gy*Gy);
     // max(grad, 255)
+    
     gradf = gradf > 255 ? 255 : gradf;
     // store values in variable for minimize work with global mem
-    ans ^= (gradf << 24);
     ans ^= (gradf << 16);
     ans ^= (gradf << 8);
+    ans ^= (gradf);
 
     // locate in global mem
     d_data[idy*w + idx] = ans;
 }
 
+
+struct class_data{
+    float avg_red;
+    float avg_green;
+    float avg_blue;
+
+    float cov11;
+    float cov12;
+    float cov13;
+
+    float cov21;
+    float cov22;
+    float cov23;
+
+    float cov31;
+    float cov32;
+    float cov33;
+
+    float log_cov;
+};
+
+
+__constant__ class_data computation_data[MAX_CLASS_NUMBERS];
+
+
+// classsificator(variant #1)
+__global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_t classes){
+    uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    uint32_t step_x = blockDim.x * gridDim.x;
+    uint32_t step_y = blockDim.y * gridDim.y;
+
+    // run for axis y
+    for(uint32_t i = idy; i < h; i += step_y){
+        // run for axis x
+        for(uint32_t j = idx; j < w; j += step_x){
+            // init very big num
+            float min = (float) INT64_MAX;
+            uint8_t ans_c = 0;
+
+            uint32_t pixel = picture[i*h + j];
+
+            for(uint8_t c = 0; c < classes; ++c){
+                float red = RED(pixel);
+                float green = GREEN(pixel);
+                float blue = BLUE(pixel);
+
+                float metric = 0.0;
+
+                red -= computation_data[c].avg_red;
+                green -= computation_data[c].avg_green;
+                blue -= computation_data[c].avg_blue;
+
+                float temp_red = red*computation_data[c].cov11 + 
+                    green*computation_data[c].cov21 + blue*computation_data[c].cov31;
+
+                float temp_green = red*computation_data[c].cov12 + 
+                    green*computation_data[c].cov22 + blue*computation_data[c].cov32;
+                
+                float temp_blue = red*computation_data[c].cov13 + 
+                    green*computation_data[c].cov23 + blue*computation_data[c].cov33;
+                
+                // dot + log(|cov|)
+                metric = temp_red*red + temp_green*green + temp_blue*blue + computation_data[c].log_cov;
+                
+                if(metric < min){
+                    ans_c = c;
+                    min = metric;
+                }
+            }
+
+            // set pixel alpha chanel
+            picture[i*h + j] ^= (ans_c << 24);
+        }
+    }
+}
+
+
+
 // exceptions if error
-void throw_on_cuda_error(cudaError_t code)
+void throw_on_cuda_error(const cudaError_t& code)
 {
   if(code != cudaSuccess)
   {
@@ -78,16 +168,20 @@ void throw_on_cuda_error(cudaError_t code)
 }
 
 
+
+
 // Image
 class CUDAImage{
 public:
-    CUDAImage() : _data(nullptr), _widht(0), _height(0){}
+    CUDAImage() : _data(nullptr), _widht(0), _height(0){
+
+    }
 
     CUDAImage(const string& path) : CUDAImage(){
-        ifstream fin(path);
+        ifstream fin(path, ios::in | ios::binary);
         if(!fin.is_open()){
             cout << "ERROR" << endl;
-            exit(0);
+            throw std::runtime_error("cant open file!");
         }
 
         fin >> (*this);
@@ -102,10 +196,12 @@ public:
 
     // out is not parallel because order is important
     friend ostream& operator<<(ostream& os, const CUDAImage& img){
-        os.unsetf(ios::dec);
-        os.setf(ios::hex | ios::uppercase);
-        uint32_t temp;
 
+
+        #ifndef __RELEASE__
+        uint32_t temp;
+        os.unsetf(ios::dec);
+        os.setf(ios::hex);
         if(img._transpose){
             temp = CUDAImage::reverse(img._height);
             os << setfill('0') << setw(8) <<  temp  << " ";
@@ -117,14 +213,26 @@ public:
             temp = CUDAImage::reverse(img._height);
             os << setfill('0') << setw(8) <<  temp  << endl;
         }
+        #endif
 
+        #ifdef __RELEASE__
+        if(img._transpose){
+            os.write(reinterpret_cast<const char*>(&img._height), sizeof(uint32_t));
+            os.write(reinterpret_cast<const char*>(&img._widht), sizeof(uint32_t));
+        }else{
+            os.write(reinterpret_cast<const char*>(&img._widht), sizeof(uint32_t));
+            os.write(reinterpret_cast<const char*>(&img._height), sizeof(uint32_t));
+        }
+        #endif
+
+        #ifndef __RELEASE__
         if(img._transpose){
             for(uint32_t i = 0; i < img._widht; ++i){
                 for(uint32_t j = 0; j < img._height; ++j){
                     if(j){
                         os << " ";
                     }
-                    os << setfill('0') << setw(8) << img._data[j*img._widht + i];
+                    os << setfill('0') << setw(8) << reverse(img._data[j*img._widht + i]);
                 }
                 os << endl;
             }
@@ -134,19 +242,43 @@ public:
                     if(j){
                         os << " ";
                     }
-                    os << setfill('0') << setw(8) << img._data[i*img._widht + j];
+                    os << setfill('0') << setw(8) << reverse(img._data[i*img._widht + j]);
                 }
                 os << endl;
             }
         }
+        #endif
+        
+        #ifdef __RELEASE__
+        if(img._transpose){
+            for(uint32_t i = 0; i < img._widht; ++i){
+                for(uint32_t j = 0; j < img._height; ++j){
+                    os.write(reinterpret_cast<const char*>(&img._data[j*img._widht + i]), sizeof(uint32_t));
+                }
+            }
+        }else{
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    os.write(reinterpret_cast<const char*>(&img._data[i*img._widht + j]), sizeof(uint32_t));
+                }
+            }
+        }   
+        #endif     
+
+
+        #ifndef __RELEASE__
 
         os.unsetf(ios::hex);
         os.setf(ios::dec);
+
+        #endif
+
         return os;
     }
 
 
     friend istream& operator>>(istream& is, CUDAImage& img){
+        #ifndef __RELEASE__
         is.unsetf(ios::dec);
         is.setf(ios::hex);
 
@@ -155,14 +287,23 @@ public:
         img._widht = CUDAImage::reverse(temp);
         is >> temp;
         img._height = CUDAImage::reverse(temp);
-        img._data = (uint32_t*) realloc(img._data, sizeof(uint32_t)*img._widht*img._height);
 
+        #endif
+
+        #ifdef __RELEASE__
+        is.read(reinterpret_cast<char*>(&img._widht), sizeof(uint32_t));
+        is.read(reinterpret_cast<char*>(&img._height), sizeof(uint32_t));
+        #endif
+
+        img._data = (uint32_t*) realloc(img._data, sizeof(uint32_t)*img._widht*img._height);
         img._transpose = img._widht >= img._height ? 0 : 1;
 
+        #ifndef __RELEASE__
         if(img._transpose){
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     is >> img._data[i + img._height*j];
+                    img._data[i + img._height*j] = reverse(img._data[i + img._height*j]);
                 }
             }
             std::swap(img._widht, img._height);
@@ -170,12 +311,34 @@ public:
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     is >> img._data[i*img._widht + j];
+                    img._data[j + img._widht*i] = reverse(img._data[j + img._widht*i]);
                 }
             }
         }
 
         is.unsetf(ios::hex);
         is.setf(ios::dec);
+
+        #endif
+
+        #ifdef __RELEASE__
+
+        if(img._transpose){
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    is.read(reinterpret_cast<char*>(&img._data[i + img._height*j]), sizeof(uint32_t));
+                }
+            }
+            std::swap(img._widht, img._height);
+        }else{
+            for(uint32_t i = 0; i < img._height; ++i){
+                for(uint32_t j = 0; j < img._widht; ++j){
+                    is.read(reinterpret_cast<char*>(&img._data[i*img._widht + j]), sizeof(uint32_t));
+                }
+            }
+        }
+
+        #endif 
         return is;
     }
 
@@ -221,8 +384,8 @@ public:
 
         g_text.normalized = false;
 
-        g_text.addressMode[0] = cudaAddressModeMirror;
-        g_text.addressMode[1] = cudaAddressModeMirror;
+        g_text.addressMode[0] = cudaAddressModeClamp;
+        g_text.addressMode[1] = cudaAddressModeClamp;
         // cout << cudaAddressModeClamp << cudaAddressModeWrap << endl;
 
 
@@ -233,12 +396,38 @@ public:
         bloks_y += bloks_y * MAX_Y < _widht ? 1 : 0;
 
         dim3 threads = dim3(MAX_X, MAX_Y);
-        dim3 blocks = dim3(bloks_x, bloks_y);
+        dim3 blocks = dim3(bloks_y, bloks_x);
 
+
+        #ifdef __TIME_COUNT__
+        cudaEvent_t start, stop;
+        float gpu_time = 0.0;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+        #endif
+
+	    sobel<<<blocks, threads>>>(d_data, _height, _widht);
+	    throw_on_cuda_error(cudaGetLastError());
+
+
+        #ifdef __TIME_COUNT__
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&gpu_time, start, stop);
+
+        // open log:
+        ofstream log("logs.log", ios::app);
+        // title
+        log << "GPU threads: " << MAX_X * MAX_Y << endl;
+        // size:
+        log << _height << " " << _widht << endl;
+        // time:
+        log << gpu_time << endl;
+        log.close();
+        #endif
         // run filter
-        sobel<<<blocks, threads>>>(d_data, _height, _widht);
-        throw_on_cuda_error(cudaGetLastError());
-
+        
 
         throw_on_cuda_error(
             cudaMemcpy(
@@ -251,7 +440,70 @@ public:
         throw_on_cuda_error(cudaUnbindTexture(g_text));
         throw_on_cuda_error(cudaFree(d_data));
         throw_on_cuda_error(cudaFreeArray(a_data));
+    }
 
+
+    void cuda_classify_pixels(const CUDAvector<CUDAvector<uint32_t>>& indexes){
+        class_data cov_avg[MAX_CLASS_NUMBERS];
+
+        memset(cov_avg, 0, sizeof(class_data));
+
+        // compute data for classification
+        compute_conv_avg(cov_avg, indexes);
+
+        uint32_t* d_data = nullptr;
+
+        throw_on_cuda_error(
+            cudaMalloc((void**)&d_data, sizeof(uint32_t) * _widht * _height)
+        );
+
+        throw_on_cuda_error(
+            cudaMemcpy(d_data, _data, sizeof(uint32_t) * _widht * _height, cudaMemcpyHostToDevice)
+        );
+
+        throw_on_cuda_error(
+            cudaMemcpyToSymbol(computation_data, cov_avg, 
+                MAX_CLASS_NUMBERS*sizeof(class_data), 0, cudaMemcpyHostToDevice)
+        );
+
+        dim3 threads = dim3(MAX_X, MAX_Y);
+        dim3 blocks = dim3(BLOCKS_X, BLOCKS_Y);
+
+        #ifdef __TIME_COUNT__
+        cudaEvent_t start, stop;
+        float gpu_time = 0.0;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+        #endif
+
+        classification<<<blocks, threads>>>(d_data, _height, _widht, indexes.size());
+        throw_on_cuda_error(cudaGetLastError());
+
+        #ifdef __TIME_COUNT__
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&gpu_time, start, stop);
+        // open log:
+        ofstream log("logs.log", ios::app);
+        // title
+        log << "GPU threads: " << MAXPTHS << endl;
+        // size:
+        log << ans._size << endl;
+        // time:
+        log << gpu_time << endl;
+        log.close();
+        #endif
+
+        throw_on_cuda_error(
+            cudaMemcpy(
+                _data, d_data,
+                sizeof(uint32_t) * _widht * _height,
+                cudaMemcpyDeviceToHost
+            )
+        ); 
+
+        throw_on_cuda_error(cudaFree(d_data));
     }
 
 
@@ -264,6 +516,113 @@ private:
             ans ^= (temp << 8*i);
         }
         return ans;
+    }
+
+    void compute_conv_avg(class_data* cov_avg, const CUDAvector<CUDAvector<uint32_t>>& indexes){
+        // for all classes
+        for(int i = 0; i < indexes.size(); ++i){
+            double avg_red = 0.0;
+            double avg_green = 0.0;
+            double avg_blue = 0.0;
+
+            double cov[9];
+
+            // compute  avg
+            for(int j = 0; j < indexes[i].size(); j += 2){
+                uint32_t pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
+                avg_red += (double) (RED(pixel)); 
+                avg_green += (double) (GREEN(pixel));
+                avg_blue += (double) (BLUE(pixel));  
+            }
+            
+            avg_red /= 2.0 * indexes[i].size();
+            avg_green /= 2.0 * indexes[i].size();
+            avg_blue /= 2.0 * indexes[i].size();
+
+            cov_avg[i].avg_red = (float) avg_red;
+            cov_avg[i].avg_green = (float) avg_green;
+            cov_avg[i].avg_blue = (float) avg_blue;
+
+
+            // compute cov
+            for(int j = 0; j < indexes[i].size(); j+=2){
+                uint32_t pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
+                double first = (double) (RED(pixel));
+                first -= avg_red; 
+                double second = (double) (GREEN(pixel));
+                second -= avg_green;
+                double third = (double) (BLUE(pixel));
+                third -= avg_blue; 
+
+                cov[0] += first*first; // 11
+                cov[1] += first*second; // 12
+                cov[2] += first*third; // 13
+
+                cov[3] += first*second; // 21
+                cov[4] += second*second; // 22
+                cov[5] += second*third; // 23
+
+                cov[6] += third*first; // 31 
+                cov[7] += third*second; // 32
+                cov[8] += third*third; // 33
+            }
+
+            // compute back:
+            back_matrix(cov);
+
+            cov_avg[i].cov11 = (float) cov[0];
+            cov_avg[i].cov12 = (float) cov[1];
+            cov_avg[i].cov13 = (float) cov[2];
+
+            cov_avg[i].cov21 = (float) cov[3];
+            cov_avg[i].cov22 = (float) cov[4];
+            cov_avg[i].cov23 = (float) cov[5];
+
+            cov_avg[i].cov31 = (float) cov[6];
+            cov_avg[i].cov32 = (float) cov[7];
+            cov_avg[i].cov33 = (float) cov[8];
+
+            // compute log modulo:
+            cov_avg[i].log_cov = log_of_modulo(cov);
+        }
+    }
+
+    static float log_of_modulo(double* matr){
+        double ans = 0.0;
+        for(int i = 0; i < 9; ++i){
+            ans += matr[i] * matr[i];
+        }
+        // if  |cov|  == 0 => log is wery small number
+        return  ans > 0 ? (float) log(sqrt(ans)) : (float) INT64_MAX;
+    }
+
+    static void back_matrix(double* matr){
+        double A11 = matr[4]*matr[8] - matr[5]*matr[7];
+        double A12 = matr[3]*matr[8] - matr[5]*matr[6];
+        double A13 = matr[4]*matr[7] - matr[4]*matr[6];
+ 
+        double A21 = matr[1]*matr[8] - matr[2]*matr[7];
+        double A22 = matr[0]*matr[8] - matr[2]*matr[6];
+        double A23 = matr[0]*matr[7] - matr[1]*matr[6];
+
+        double A31 = matr[1]*matr[5] - matr[2]*matr[4];
+        double A32 = matr[0]*matr[5] - matr[2]*matr[3];
+        double A33 = matr[0]*matr[4] - matr[1]*matr[3];
+
+        double D = A11 * matr[1] - A12 * matr[2] + A13 * matr[3];
+
+        matr[0] = A11 / D;
+        matr[1] = A12 / D;
+        matr[2] = A13 / D;
+        
+        matr[3] = A21 / D;
+        matr[4] = A22 / D;
+        matr[5] = A23 / D;
+
+        matr[6] = A31 / D;
+        matr[7] = A32 / D;
+        matr[8] = A33 / D;
+
     }
 
     uint32_t* _data;
