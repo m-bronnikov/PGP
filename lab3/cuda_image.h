@@ -644,7 +644,7 @@ private:
         double A32 = matr[2]*matr[3] - matr[0]*matr[5];
         double A33 = matr[0]*matr[4] - matr[1]*matr[3];
 
-        double D = A11 * matr[0] - A12 * matr[1] + A13 * matr[2];
+        double D = A11 * matr[0] + A12 * matr[1] + A13 * matr[2];
 
         matr[0] = A11 / D;
         matr[1] = A21 / D;
