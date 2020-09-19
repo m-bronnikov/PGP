@@ -531,7 +531,7 @@ private:
 
             // compute  avg
             for(int j = 0; j < indexes[i].size(); j += 2){
-                uint32_t pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
+                uint32_t pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
                 avg_blue += (double) (BLUE(pixel));  
@@ -548,7 +548,7 @@ private:
 
             // compute cov
             for(int j = 0; j < indexes[i].size(); j+=2){
-                uint32_t pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
+                uint32_t pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
                 double first = (double) (RED(pixel));
                 first -= avg_red; 
                 double second = (double) (GREEN(pixel));
