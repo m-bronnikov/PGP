@@ -148,6 +148,8 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
                     ans_c = c;
                     min = metric;
                 }
+
+                printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
             }
 
             // set pixel alpha chanel
