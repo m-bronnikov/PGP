@@ -545,6 +545,9 @@ private:
             avg_green /= size;
             avg_blue /= size;
 
+            cout << "Class #" << i << " ";
+            cout << avg_red << " " << avg_green << " " << avg_blue << endl;
+
             cov_avg[i].avg_red = (float) avg_red;
             cov_avg[i].avg_green = (float) avg_green;
             cov_avg[i].avg_blue = (float) avg_blue;
