@@ -633,15 +633,15 @@ private:
 
     static void back_matrix(double* matr){
         double A11 = matr[4]*matr[8] - matr[5]*matr[7];
-        double A12 = matr[3]*matr[8] - matr[5]*matr[6];
+        double A12 = matr[5]*matr[6] - matr[3]*matr[8];
         double A13 = matr[3]*matr[7] - matr[4]*matr[6];
  
-        double A21 = matr[1]*matr[8] - matr[2]*matr[7];
+        double A21 = matr[2]*matr[7] - matr[1]*matr[8];
         double A22 = matr[0]*matr[8] - matr[2]*matr[6];
-        double A23 = matr[0]*matr[7] - matr[1]*matr[6];
+        double A23 = matr[1]*matr[6] - matr[0]*matr[7];
 
         double A31 = matr[1]*matr[5] - matr[2]*matr[4];
-        double A32 = matr[0]*matr[5] - matr[2]*matr[3];
+        double A32 = matr[2]*matr[3] - matr[0]*matr[5];
         double A33 = matr[0]*matr[4] - matr[1]*matr[3];
 
         double D = A11 * matr[0] - A12 * matr[1] + A13 * matr[2];
