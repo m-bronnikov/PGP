@@ -448,7 +448,7 @@ public:
     void cuda_classify_pixels(const CUDAvector<CUDAvector<uint32_t>>& indexes){
         class_data cov_avg[MAX_CLASS_NUMBERS];
 
-        memset(cov_avg, 0, sizeof(class_data));
+        //memset(cov_avg, 0, sizeof(class_data));
 
         // compute data for classification
         compute_conv_avg(cov_avg, indexes);
@@ -528,6 +528,7 @@ private:
             double avg_blue = 0.0;
 
             double cov[9];
+            memset(cov, 0, sizeof(double)*9)
             
             // npj
             uint32_t size = indexes[i].size() >> 1;
