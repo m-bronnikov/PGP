@@ -14,7 +14,7 @@ using namespace std;
 #define  MAXDELTA 10000
 #define MAXPTHS 1024
 
-#define __DEBUG__
+// #define __DEBUG__
 
 template<typename T>
 __global__ void elem_min(T* d_left, T* d_right, T* d_ans, int size){
