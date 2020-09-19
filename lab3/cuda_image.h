@@ -28,7 +28,7 @@ using namespace std;
 
 #define MAX_CLASS_NUMBERS 32
 
-#define __RELEASE__
+#define __DEBUG__
 #define __NOT_TIME_COUNT__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
@@ -454,7 +454,7 @@ public:
     void cuda_classify_pixels(const CUDAvector<CUDAvector<uint32_t>>& indexes){
         class_data cov_avg[MAX_CLASS_NUMBERS];
 
-        //memset(cov_avg, 0, sizeof(class_data));
+        // memset(cov_avg, 0, sizeof(class_data));
 
         // compute data for classification
         compute_conv_avg(cov_avg, indexes);
@@ -528,7 +528,7 @@ private:
 
     void compute_conv_avg(class_data* cov_avg, const CUDAvector<CUDAvector<uint32_t>>& indexes){
         // for all classes
-        for(int i = 0; i < indexes.size(); ++i){
+        for(uint32_t i = 0; i < indexes.size(); ++i){
             double avg_red = 0.0;
             double avg_green = 0.0;
             double avg_blue = 0.0;
@@ -540,7 +540,7 @@ private:
             uint32_t size = indexes[i].size() >> 1;
 
             // compute  avg
-            for(int j = 0; j < indexes[i].size(); j += 2){
+            for(uint32_t j = 0; j < indexes[i].size(); j += 2){
                 uint32_t pixel = 0;
                 if(_transpose){
                     pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
@@ -578,7 +578,7 @@ private:
 
 
             // compute cov
-            for(int j = 0; j < indexes[i].size(); j+=2){
+            for(uint32_t j = 0; j < indexes[i].size(); j+=2){
                 uint32_t pixel = 0;
                 if(_transpose){
                     pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];

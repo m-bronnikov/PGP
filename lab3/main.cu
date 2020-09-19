@@ -39,7 +39,7 @@ int main(){
         img.cuda_classify_pixels(points);
     }catch(std::runtime_error &exception){
         cout << "ERROR: " << exception.what() << endl;
-        //return 0;
+        return 0;
     }
 
     fout << img;
