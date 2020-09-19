@@ -612,6 +612,11 @@ private:
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
 
+            cout << cov[0] << " " << cov[1] << " " << cov[2] << " ";
+            cout << cov[3] << " " << cov[4] << " " << cov[5] << " ";
+            cout << cov[6] << " " << cov[7] << " " << cov[8];
+
+
             // compute log modulo:
             cov_avg[i].log_cov = log_of_modulo(cov);
         }
