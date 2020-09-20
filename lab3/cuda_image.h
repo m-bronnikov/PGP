@@ -640,6 +640,19 @@ private:
             cov[7] /= size - 1;
             cov[8] /= size - 1;
 
+            cout << "Cov:" << endl;
+            cout <<  (float) cov[0] << " ";
+            cout << (float) cov[1] << " ";
+            cout << (float) cov[2] << endl;
+
+            cout <<  (float) cov[0] << " ";
+            cout << (float) cov[1] << " ";
+            cout << (float) cov[2] << endl;
+
+            cout <<  (float) cov[0] << " ";
+            cout << (float) cov[1] << " ";
+            cout << (float) cov[2] << endl;
+
             // compute back:
             back_matrix(cov);
 
@@ -656,7 +669,7 @@ private:
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
 
-            cout << "Cov:" << endl;
+            cout << "Cov-1:" << endl;
             cout <<  (float) cov[0] << " ";
             cout << (float) cov[1] << " ";
             cout << (float) cov[2] << endl;
