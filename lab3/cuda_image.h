@@ -578,14 +578,8 @@ private:
                 // read pixel and update alpha if exist
                 if(_transpose){
                     pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
-                    uint8_t alpha = i;
-                    pixel ^= ((uint32_t)alpha) << 24;
-                    _data[indexes[i][j]*_widht + indexes[i][j+1]] = pixel;
                 }else{
                     pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
-                    uint8_t alpha = i;
-                    pixel ^= ((uint32_t)alpha) << 24;
-                    _data[indexes[i][j+1]*_widht + indexes[i][j]] = pixel;
                 }
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
@@ -617,6 +611,9 @@ private:
                 second -= avg_green;
                 double third = (double) (BLUE(pixel));
                 third -= avg_blue; 
+
+                cout << "pixel #" << (j >> 1) << ":" << endl;
+                cout << first << " " << second << " " << third << endl;
 
                 cov[0] += first*first; // 11
                 cov[1] += first*second; // 12
