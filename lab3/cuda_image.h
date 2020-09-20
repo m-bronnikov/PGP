@@ -717,6 +717,8 @@ private:
 
         double D = A11 * matr[0] + A12 * matr[1] + A13 * matr[2];
 
+        cout << "D: " << D << endl;
+
         matr[0] = A11 / D;
         matr[1] = A21 / D;
         matr[2] = A31 / D;
