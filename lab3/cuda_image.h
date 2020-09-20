@@ -116,9 +116,6 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
 
     // run for axis y
     for(uint32_t i = idy; i < h; i += step_y){
-        if(idy == 100){
-            printf("[%d]/[%d] step:%d\n", i, h, step_y);
-        }
         // run for axis x
         for(uint32_t j = idx; j < w; j += step_x){
             // init very big num
@@ -164,7 +161,9 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             }
 
             //printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
-
+            if(idy == 100 && idx = 100){
+                printf("[%d, %d]/[%d, %d] step:%d\n", i, j, h, w, step_y);
+            }
 
             // set pixel alpha chanel
 
