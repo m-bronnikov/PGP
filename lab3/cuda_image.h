@@ -30,7 +30,7 @@ using namespace std;
 
 #define __RELEASE__
 // #define __TIME_COUNT__
-#define __WITH_IMG__
+// #define __WITH_IMG__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
@@ -161,11 +161,11 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             }
 
             //printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
-            
+            /*
             if(idy == 100 && idx == 100){
                 printf("[%d, %d]/[%d, %d] step:%d\n", i, j, h, w, step_y);
             }
-            
+            */
             // set pixel alpha chanel
 
             #ifndef __WITH_IMG__
