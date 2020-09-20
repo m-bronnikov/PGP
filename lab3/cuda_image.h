@@ -158,14 +158,18 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
                     ans_c = c;
                     min = metric;
                 }
+
+		if(idy == 100 && idx == 100){
+                    printf("[%d, %d](%d) = %f\n", i, j, c, metric);
+            	}
             }
 
-            //printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
-            /*
+           
+            
             if(idy == 100 && idx == 100){
                 printf("[%d, %d]/[%d, %d] step:%d\n", i, j, h, w, step_y);
             }
-            */
+            
             // set pixel alpha chanel
 
             #ifndef __WITH_IMG__
