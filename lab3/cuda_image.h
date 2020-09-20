@@ -28,7 +28,7 @@ using namespace std;
 
 #define MAX_CLASS_NUMBERS 32
 
-#define __DEBUG__
+#define __RELEASE__
 #define __NOT_TIME_COUNT__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
@@ -122,9 +122,13 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             uint8_t ans_c = 0;
 
             uint32_t pixel = picture[i*h + j];
+            /*
             ans_c = ALPHA(pixel);
-            // make alpha chanel is zero if it was != 0
-            pixel ^= ((uint32_t) ans_c) << 24;
+            // if alpha  is exist => not need to compute
+            if(ans_c){
+                continue;
+            }
+            */
 
             for(uint8_t c = 0; c < classes; ++c){
                 float red = RED(pixel);
@@ -153,12 +157,25 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
                     ans_c = c;
                     min = metric;
                 }
-
-                // printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
             }
 
+            //printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
+
+
             // set pixel alpha chanel
-            pixel ^= (ans_c << 24);
+
+            /*
+            pixel ^= ((uint32_t) ans_c) << 24;
+            */
+            uint32_t color1 = RED(pixel);
+            uint32_t color2 = GREEN(pixel);
+            uint32_t color3 = BLUE(pixel);
+
+            pixel = 0;
+            pixel ^= color1;
+            pixel ^= color2 << 8;
+            pixel ^= color3 << 16;
+
             picture[i*h + j] = pixel;
         }
     }
@@ -204,8 +221,7 @@ public:
 
     // out is not parallel because order is important
     friend ostream& operator<<(ostream& os, const CUDAImage& img){
-
-
+        
         #ifndef __RELEASE__
         uint32_t temp;
         os.unsetf(ios::dec);
@@ -334,14 +350,20 @@ public:
         if(img._transpose){
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
+                    uint32_t alpha = 0;
                     is.read(reinterpret_cast<char*>(&img._data[i + img._height*j]), sizeof(uint32_t));
+                    alpha = ALPHA(img._data[i + img._height*j]);
+                    img._data[i + img._height*j] ^= alpha << 24;
                 }
             }
             std::swap(img._widht, img._height);
         }else{
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
+                    uint32_t alpha = 0;
                     is.read(reinterpret_cast<char*>(&img._data[i*img._widht + j]), sizeof(uint32_t));
+                    alpha = ALPHA(img._data[i*img._widht + j]);
+                    img._data[i*img._widht + j] ^= alpha << 24;
                 }
             }
         }
@@ -542,10 +564,17 @@ private:
             // compute  avg
             for(uint32_t j = 0; j < indexes[i].size(); j += 2){
                 uint32_t pixel = 0;
+                // read pixel and update alpha if exist
                 if(_transpose){
                     pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
+                    uint8_t alpha = i;
+                    pixel ^= ((uint32_t)alpha) << 24;
+                    _data[indexes[i][j]*_widht + indexes[i][j+1]] = pixel;
                 }else{
                     pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
+                    uint8_t alpha = i;
+                    pixel ^= ((uint32_t)alpha) << 24;
+                    _data[indexes[i][j+1]*_widht + indexes[i][j]] = pixel;
                 }
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
