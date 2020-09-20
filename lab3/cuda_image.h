@@ -116,7 +116,7 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
 
     // run for axis y
     for(uint32_t i = idy; i < h; i += step_y){
-        if(idx == 100){
+        if(idy == 100){
             printf("[%d]/[%d] step:%d\n", i, h, step_y);
         }
         // run for axis x
