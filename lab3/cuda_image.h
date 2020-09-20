@@ -612,8 +612,10 @@ private:
                 double third = (double) (BLUE(pixel));
                 third -= avg_blue; 
 
+                /*
                 cout << "pixel #" << (j >> 1) << ":" << endl;
                 cout << first << " " << second << " " << third << endl;
+                */
 
                 cov[0] += first*first; // 11
                 cov[1] += first*second; // 12
@@ -640,6 +642,7 @@ private:
             cov[7] /= size - 1;
             cov[8] /= size - 1;
 
+            /*
             cout << "Cov:" << endl;
             cout <<  (float) cov[0] << " ";
             cout << (float) cov[1] << " ";
@@ -652,6 +655,7 @@ private:
             cout <<  (float) cov[6] << " ";
             cout << (float) cov[7] << " ";
             cout << (float) cov[8] << endl;
+            */
 
             // compute back:
             back_matrix(cov);
@@ -669,6 +673,7 @@ private:
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
 
+            /*
             cout << "Cov-1:" << endl;
             cout <<  (float) cov[0] << " ";
             cout << (float) cov[1] << " ";
@@ -687,6 +692,7 @@ private:
             cout << (float) avg_green << " ";
             cout << (float) avg_blue << endl;
             cout << endl;
+            */
 
             // compute log modulo:
             cov_avg[i].log_cov = log_of_modulo(cov);
