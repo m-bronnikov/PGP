@@ -29,8 +29,8 @@ using namespace std;
 #define MAX_CLASS_NUMBERS 32
 
 #define __RELEASE__
-// #define __TIME_COUNT__
-#define __WITH_IMG__
+#define __NOT_TIME_COUNT__
+// #define __WITH_IMG__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
@@ -119,17 +119,14 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
         // run for axis x
         for(uint32_t j = idx; j < w; j += step_x){
             // init very big num
-            float min = (float) INT64_MAX;
+            float min =  INT32_MAX;
             uint8_t ans_c = 0;
 
             uint32_t pixel = picture[i*w + j];
-            /*
             ans_c = ALPHA(pixel);
-            // if alpha  is exist => not need to compute
             if(ans_c){
                 continue;
             }
-            */
 
             for(uint8_t c = 0; c < classes; ++c){
                 float red = RED(pixel);
@@ -152,25 +149,15 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
                     green*computation_data[c].cov23 + blue*computation_data[c].cov33;
                 
                 // dot + log(|cov|)
-                metric = temp_red*red + temp_green*green + temp_blue*blue + computation_data[c].log_cov;
+                metric = (float)(temp_red*red + temp_green*green + temp_blue*blue + computation_data[c].log_cov);
                 
                 if(metric < min){
                     ans_c = c;
                     min = metric;
                 }
 
-		        if(idy == 100 && idx == 100){
-                    printf("[%d, %d](%d) = %f\n", i, j, c, metric);
-            	}
+                // printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
             }
-
-           
-            
-            if(idy == 100 && idx == 100){
-                printf("[%d, %d]/[%d, %d] step:%d\n", i, j, h, w, step_y);
-            }
-            
-            // set pixel alpha chanel
 
             #ifndef __WITH_IMG__
             pixel ^= ((uint32_t) ans_c) << 24;
@@ -232,7 +219,8 @@ public:
 
     // out is not parallel because order is important
     friend ostream& operator<<(ostream& os, const CUDAImage& img){
-        
+
+
         #ifndef __RELEASE__
         uint32_t temp;
         os.unsetf(ios::dec);
@@ -361,20 +349,14 @@ public:
         if(img._transpose){
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
-                    uint32_t alpha = 0;
                     is.read(reinterpret_cast<char*>(&img._data[i + img._height*j]), sizeof(uint32_t));
-                    alpha = ALPHA(img._data[i + img._height*j]);
-                    img._data[i + img._height*j] ^= alpha << 24;
                 }
             }
             std::swap(img._widht, img._height);
         }else{
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
-                    uint32_t alpha = 0;
                     is.read(reinterpret_cast<char*>(&img._data[i*img._widht + j]), sizeof(uint32_t));
-                    alpha = ALPHA(img._data[i*img._widht + j]);
-                    img._data[i*img._widht + j] ^= alpha << 24;
                 }
             }
         }
@@ -578,20 +560,44 @@ private:
                 // read pixel and update alpha if exist
                 if(_transpose){
                     pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
+                    
+                    uint8_t alpha = i;
+                    pixel ^= ((uint32_t)alpha) << 24;
+                    _data[indexes[i][j]*_widht + indexes[i][j+1]] = pixel;
+                    
                 }else{
                     pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
+                    
+                    uint8_t alpha = i;
+                    pixel ^= ((uint32_t)alpha) << 24;
+                    _data[indexes[i][j+1]*_widht + indexes[i][j]] = pixel;
+                    
                 }
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
                 avg_blue += (double) (BLUE(pixel)); 
+                /*
+                cout << "r[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
+                cout << (RED(pixel));
+                cout << endl;
+                cout << "g[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
+                cout << (GREEN(pixel));
+                cout << endl;
+                cout << "b[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
+                cout << (BLUE(pixel));
+                cout << endl;
+                */
             }
             
             avg_red /= size;
             avg_green /= size;
             avg_blue /= size;
 
+            /*
+            cout << "Class #" << i << " ";
+            cout << avg_red << " " << avg_green << " " << avg_blue << endl;
+            */
 
-            // write avg
             cov_avg[i].avg_red = (float) avg_red;
             cov_avg[i].avg_green = (float) avg_green;
             cov_avg[i].avg_blue = (float) avg_blue;
@@ -611,11 +617,6 @@ private:
                 second -= avg_green;
                 double third = (double) (BLUE(pixel));
                 third -= avg_blue; 
-
-                /*
-                cout << "pixel #" << (j >> 1) << ":" << endl;
-                cout << first << " " << second << " " << third << endl;
-                */
 
                 cov[0] += first*first; // 11
                 cov[1] += first*second; // 12
@@ -642,25 +643,9 @@ private:
             cov[7] /= size - 1;
             cov[8] /= size - 1;
 
-            /*
-            cout << "Cov:" << endl;
-            cout <<  (float) cov[0] << " ";
-            cout << (float) cov[1] << " ";
-            cout << (float) cov[2] << endl;
-
-            cout << (float) cov[3] << " ";
-            cout << (float) cov[4] << " ";
-            cout << (float) cov[5] << endl;
-
-            cout <<  (float) cov[6] << " ";
-            cout << (float) cov[7] << " ";
-            cout << (float) cov[8] << endl;
-            */
-
             // compute back:
             back_matrix(cov);
 
-            // write back:
             cov_avg[i].cov11 = (float) cov[0];
             cov_avg[i].cov12 = (float) cov[1];
             cov_avg[i].cov13 = (float) cov[2];
@@ -672,27 +657,12 @@ private:
             cov_avg[i].cov31 = (float) cov[6];
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
-
             /*
-            cout << "Cov-1:" << endl;
-            cout <<  (float) cov[0] << " ";
-            cout << (float) cov[1] << " ";
-            cout << (float) cov[2] << endl;
-
-            cout <<  (float) cov[3] << " ";
-            cout << (float) cov[4] << " ";
-            cout << (float) cov[5] << endl;
-
-            cout <<  (float) cov[6] << " ";
-            cout << (float) cov[7] << " ";
-            cout << (float) cov[8] << endl;
-
-            cout << "Avg:" << endl;
-            cout << (float) avg_red << " ";
-            cout << (float) avg_green << " ";
-            cout << (float) avg_blue << endl;
-            cout << endl;
+            cout << cov[0] << " " << cov[1] << " " << cov[2] << endl;
+            cout << cov[3] << " " << cov[4] << " " << cov[5] << endl;
+            cout << cov[6] << " " << cov[7] << " " << cov[8] << endl;
             */
+
 
             // compute log modulo:
             cov_avg[i].log_cov = log_of_modulo(cov);
@@ -705,7 +675,7 @@ private:
             ans += matr[i] * matr[i];
         }
         // if  |cov|  == 0 => log is wery small number
-        return  ans > 0 ? (float) log(sqrt(ans)) : (float) INT64_MAX;
+        return  (float) log(sqrt(ans));
     }
 
     static void back_matrix(double* matr){
@@ -722,8 +692,6 @@ private:
         double A33 = matr[0]*matr[4] - matr[1]*matr[3];
 
         double D = A11 * matr[0] + A12 * matr[1] + A13 * matr[2];
-
-        cout << "D: " << D << endl;
 
         matr[0] = A11 / D;
         matr[1] = A21 / D;
