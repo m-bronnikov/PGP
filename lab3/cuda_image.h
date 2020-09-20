@@ -159,7 +159,7 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
                     min = metric;
                 }
 
-		if(idy == 100 && idx == 100){
+		        if(idy == 100 && idx == 100){
                     printf("[%d, %d](%d) = %f\n", i, j, c, metric);
             	}
             }
@@ -659,6 +659,24 @@ private:
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
 
+            cout << "Cov:" << endl;
+            cout <<  (float) cov[0] << " ";
+            cout << (float) cov[1] << " ";
+            cout << (float) cov[2] << endl;
+
+            cout <<  (float) cov[0] << " ";
+            cout << (float) cov[1] << " ";
+            cout << (float) cov[2] << endl;
+
+            cout <<  (float) cov[0] << " ";
+            cout << (float) cov[1] << " ";
+            cout << (float) cov[2] << endl;
+
+            cout << "Avg:" << endl;
+            cout << (float) avg_red << " ";
+            cout << (float) avg_green << " ";
+            cout << (float) avg_blue << endl;
+            cout << endl;
 
             // compute log modulo:
             cov_avg[i].log_cov = log_of_modulo(cov);
