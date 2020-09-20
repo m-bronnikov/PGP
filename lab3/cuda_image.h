@@ -645,13 +645,13 @@ private:
             cout << (float) cov[1] << " ";
             cout << (float) cov[2] << endl;
 
-            cout <<  (float) cov[0] << " ";
-            cout << (float) cov[1] << " ";
-            cout << (float) cov[2] << endl;
+            cout << (float) cov[3] << " ";
+            cout << (float) cov[4] << " ";
+            cout << (float) cov[5] << endl;
 
-            cout <<  (float) cov[0] << " ";
-            cout << (float) cov[1] << " ";
-            cout << (float) cov[2] << endl;
+            cout <<  (float) cov[6] << " ";
+            cout << (float) cov[7] << " ";
+            cout << (float) cov[8] << endl;
 
             // compute back:
             back_matrix(cov);
@@ -674,13 +674,13 @@ private:
             cout << (float) cov[1] << " ";
             cout << (float) cov[2] << endl;
 
-            cout <<  (float) cov[0] << " ";
-            cout << (float) cov[1] << " ";
-            cout << (float) cov[2] << endl;
+            cout <<  (float) cov[3] << " ";
+            cout << (float) cov[4] << " ";
+            cout << (float) cov[5] << endl;
 
-            cout <<  (float) cov[0] << " ";
-            cout << (float) cov[1] << " ";
-            cout << (float) cov[2] << endl;
+            cout <<  (float) cov[6] << " ";
+            cout << (float) cov[7] << " ";
+            cout << (float) cov[8] << endl;
 
             cout << "Avg:" << endl;
             cout << (float) avg_red << " ";
