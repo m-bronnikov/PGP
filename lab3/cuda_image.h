@@ -167,9 +167,9 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             /*
             pixel ^= ((uint32_t) ans_c) << 24;
             */
-            uint32_t color1 = RED(pixel);
-            uint32_t color2 = GREEN(pixel);
-            uint32_t color3 = BLUE(pixel);
+            uint32_t color1 = (uint32_t) computation_data[c].avg_red;
+            uint32_t color2 = (uint32_t) computation_data[c].avg_green;
+            uint32_t color3 = (uint32_t) computation_data[c].avg_blue;
 
             pixel = 0;
             pixel ^= color1;
