@@ -29,7 +29,8 @@ using namespace std;
 #define MAX_CLASS_NUMBERS 32
 
 #define __RELEASE__
-#define __NOT_TIME_COUNT__
+// #define __TIME_COUNT__
+#define __WITH_IMG__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
@@ -115,6 +116,9 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
 
     // run for axis y
     for(uint32_t i = idy; i < h; i += step_y){
+        if(idx == 100){
+            printf("[%d]/[%d] step:%d\n", i, h, step_y);
+        }
         // run for axis x
         for(uint32_t j = idx; j < w; j += step_x){
             // init very big num
@@ -164,9 +168,11 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
 
             // set pixel alpha chanel
 
-            /*
+            #ifndef __WITH_IMG__
             pixel ^= ((uint32_t) ans_c) << 24;
-            */
+            #endif
+            
+            #ifdef __WITH_IMG__
             uint32_t color1 = (uint32_t) computation_data[ans_c].avg_red;
             uint32_t color2 = (uint32_t) computation_data[ans_c].avg_green;
             uint32_t color3 = (uint32_t) computation_data[ans_c].avg_blue;
@@ -175,6 +181,7 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             pixel ^= color1;
             pixel ^= color2 << 8;
             pixel ^= color3 << 16;
+            #endif
 
             picture[i*h + j] = pixel;
         }
@@ -579,28 +586,14 @@ private:
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
                 avg_blue += (double) (BLUE(pixel)); 
-                /*
-                cout << "r[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (RED(pixel));
-                cout << endl;
-                cout << "g[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (GREEN(pixel));
-                cout << endl;
-                cout << "b[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (BLUE(pixel));
-                cout << endl;
-                */
             }
             
             avg_red /= size;
             avg_green /= size;
             avg_blue /= size;
 
-            /*
-            cout << "Class #" << i << " ";
-            cout << avg_red << " " << avg_green << " " << avg_blue << endl;
-            */
 
+            // write avg
             cov_avg[i].avg_red = (float) avg_red;
             cov_avg[i].avg_green = (float) avg_green;
             cov_avg[i].avg_blue = (float) avg_blue;
@@ -649,6 +642,7 @@ private:
             // compute back:
             back_matrix(cov);
 
+            // write back:
             cov_avg[i].cov11 = (float) cov[0];
             cov_avg[i].cov12 = (float) cov[1];
             cov_avg[i].cov13 = (float) cov[2];
@@ -660,11 +654,6 @@ private:
             cov_avg[i].cov31 = (float) cov[6];
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
-            /*
-            cout << cov[0] << " " << cov[1] << " " << cov[2] << endl;
-            cout << cov[3] << " " << cov[4] << " " << cov[5] << endl;
-            cout << cov[6] << " " << cov[7] << " " << cov[8] << endl;
-            */
 
 
             // compute log modulo:
