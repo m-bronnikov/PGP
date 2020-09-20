@@ -30,7 +30,7 @@ using namespace std;
 
 #define __RELEASE__
 #define __NOT_TIME_COUNT__
-// #define __WITH_IMG__
+#define __WITH_IMG__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
