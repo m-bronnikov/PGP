@@ -33,6 +33,11 @@ int main(){
     ifstream fin(path1, ios::in | ios::binary);
     ofstream fout(path2, ios::out | ios::binary);
 
+    if(!fin || !fout){
+        cout << "ERROR: " << "Cant open file" << endl;
+        return 0;
+    }
+
     fin >> img;
 
     try{
