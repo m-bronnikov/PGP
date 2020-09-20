@@ -122,7 +122,7 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             float min = (float) INT64_MAX;
             uint8_t ans_c = 0;
 
-            uint32_t pixel = picture[i*h + j];
+            uint32_t pixel = picture[i*w + j];
             /*
             ans_c = ALPHA(pixel);
             // if alpha  is exist => not need to compute
@@ -182,7 +182,7 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             pixel ^= color3 << 16;
             #endif
 
-            picture[i*h + j] = pixel;
+            picture[i*w + j] = pixel;
         }
     }
 }
