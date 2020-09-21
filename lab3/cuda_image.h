@@ -599,7 +599,7 @@ private:
 
             
             cout << "Class #" << i << endl;
-            cout << "Avg:"
+            cout << "Avg:" << endl;
             cout << avg_red << " " << avg_green << " " << avg_blue << endl;
             
 
