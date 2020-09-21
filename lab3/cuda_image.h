@@ -124,12 +124,6 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
 
             uint32_t pixel = picture[i*w + j];
             uint8_t ans_c = 0;
-            
-            /*
-            if(ans_c){
-                continue;
-            }
-            */
 
             for(uint8_t c = 0; c < classes; ++c){
                 float red = RED(pixel);
@@ -158,8 +152,6 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
                     ans_c = c;
                     min = metric;
                 }
-
-                // printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
             }
 
             #ifndef __WITH_IMG__
@@ -200,15 +192,13 @@ void throw_on_cuda_error(const cudaError_t& code)
 // Image
 class CUDAImage{
 public:
-    CUDAImage() : _data(nullptr), _widht(0), _height(0){
-
-    }
+    CUDAImage() : _data(nullptr), _widht(0), _height(0){}
 
     CUDAImage(const string& path) : CUDAImage(){
         ifstream fin(path, ios::in | ios::binary);
         if(!fin.is_open()){
             cout << "ERROR" << endl;
-            throw std::runtime_error("cant open file!");
+            throw std::runtime_error("Can't open file!");
         }
 
         fin >> (*this);
@@ -221,9 +211,8 @@ public:
         _height = _widht = 0;
     }
 
-    // out is not parallel because order is important
+    // write 
     friend ostream& operator<<(ostream& os, const CUDAImage& img){
-
 
         #ifndef __RELEASE__
         uint32_t temp;
@@ -303,7 +292,7 @@ public:
         return os;
     }
 
-
+    // read
     friend istream& operator>>(istream& is, CUDAImage& img){
         #ifndef __RELEASE__
         is.unsetf(ios::dec);
@@ -354,8 +343,6 @@ public:
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     is.read(reinterpret_cast<char*>(&img._data[i + img._height*j]), sizeof(uint32_t));
-                    // clear alpha chanel
-                    img._data[i + img._height*j] = clear_alpha(img._data[i + img._height*j]);
                 }
             }
             std::swap(img._widht, img._height);
@@ -363,8 +350,6 @@ public:
             for(uint32_t i = 0; i < img._height; ++i){
                 for(uint32_t j = 0; j < img._widht; ++j){
                     is.read(reinterpret_cast<char*>(&img._data[i*img._widht + j]), sizeof(uint32_t));
-                    // clear alpha chanel
-                    img._data[i*img._widht + j] = clear_alpha(img._data[i*img._widht + j]);
                 }
             }
         }
@@ -379,7 +364,6 @@ public:
         _widht = _height = 0;
     }
 
-    // 10000
     // make filration
     void cuda_filter_img(){
         // device data
@@ -473,7 +457,7 @@ public:
         throw_on_cuda_error(cudaFreeArray(a_data));
     }
 
-
+    // make classsification by points
     void cuda_classify_pixels(const vector<vector<uint32_t>>& indexes){
         class_data cov_avg[MAX_CLASS_NUMBERS];
 
@@ -576,44 +560,17 @@ private:
                 // read pixel and update alpha if exist
                 if(_transpose){
                     pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
-                    /*
-                    uint8_t alpha = i;
-                    pixel ^= ((uint32_t)alpha) << 24;
-                    _data[indexes[i][j]*_widht + indexes[i][j+1]] = pixel;
-                    */
                 }else{
                     pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
-                    /*
-                    uint8_t alpha = i;
-                    pixel ^= ((uint32_t)alpha) << 24;
-                    _data[indexes[i][j+1]*_widht + indexes[i][j]] = pixel;
-                    */
                 }
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
                 avg_blue += (double) (BLUE(pixel)); 
-                /*
-                cout << "r[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (RED(pixel));
-                cout << endl;
-                cout << "g[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (GREEN(pixel));
-                cout << endl;
-                cout << "b[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (BLUE(pixel));
-                cout << endl;
-                */
             }
             
             avg_red /= size;
             avg_green /= size;
             avg_blue /= size;
-
-            /*
-            cout << "Class #" << i << endl;
-            cout << "Avg:" << endl;
-            cout << avg_red << " " << avg_green << " " << avg_blue << endl;
-            */
             
 
             cov_avg[i].avg_red = (float) avg_red;
@@ -675,14 +632,6 @@ private:
             cov_avg[i].cov31 = (float) cov[6];
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
-
-            /*
-            cout << "Cov-1:" << endl;
-            cout << cov[0] << " " << cov[1] << " " << cov[2] << endl;
-            cout << cov[3] << " " << cov[4] << " " << cov[5] << endl;
-            cout << cov[6] << " " << cov[7] << " " << cov[8] << endl;
-            cout << endl;
-            */
 
 
             // compute log of modulo:
