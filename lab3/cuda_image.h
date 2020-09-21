@@ -26,11 +26,12 @@ using namespace std;
 #define ALPHA(x) ((x) >> 24)&255
 
 
+
 #define MAX_CLASS_NUMBERS 32
 
 #define __RELEASE__
 #define __NOT_TIME_COUNT__
-#define __WITH_IMG__
+#define __NOT_WITH_IMG__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
@@ -99,7 +100,7 @@ struct class_data{
     float cov32;
     float cov33;
 
-    float log_cov;
+    float log_det;
 };
 
 
@@ -120,13 +121,9 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
         for(uint32_t j = idx; j < w; j += step_x){
             // init very big num
             float min =  INT32_MAX;
-            uint8_t ans_c = 0;
 
             uint32_t pixel = picture[i*w + j];
-            ans_c = ALPHA(pixel);
-            if(ans_c){
-                continue;
-            }
+            uint8_t ans_c = 0;
 
             for(uint8_t c = 0; c < classes; ++c){
                 float red = RED(pixel);
@@ -149,14 +146,12 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
                     green*computation_data[c].cov23 + blue*computation_data[c].cov33;
                 
                 // dot + log(|cov|)
-                metric = (float)(temp_red*red + temp_green*green + temp_blue*blue + computation_data[c].log_cov);
+                metric = (temp_red*red + temp_green*green + temp_blue*blue + computation_data[c].log_det);
                 
                 if(metric < min){
                     ans_c = c;
                     min = metric;
                 }
-
-                // printf("[%d, %d](%d) = %f\n", idy, idx, c, metric);
             }
 
             #ifndef __WITH_IMG__
@@ -164,9 +159,6 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             #endif
             
             #ifdef __WITH_IMG__
-            if(idx == 20 && idy == 10){
-                printf("[%d, %d] = %d\n", i, j, pixel);
-            }
 
             uint32_t color1 = (uint32_t) computation_data[ans_c].avg_red;
             uint32_t color2 = (uint32_t) computation_data[ans_c].avg_green;
@@ -200,15 +192,13 @@ void throw_on_cuda_error(const cudaError_t& code)
 // Image
 class CUDAImage{
 public:
-    CUDAImage() : _data(nullptr), _widht(0), _height(0){
-
-    }
+    CUDAImage() : _data(nullptr), _widht(0), _height(0){}
 
     CUDAImage(const string& path) : CUDAImage(){
         ifstream fin(path, ios::in | ios::binary);
         if(!fin.is_open()){
             cout << "ERROR" << endl;
-            throw std::runtime_error("cant open file!");
+            throw std::runtime_error("Can't open file!");
         }
 
         fin >> (*this);
@@ -221,9 +211,8 @@ public:
         _height = _widht = 0;
     }
 
-    // out is not parallel because order is important
+    // write 
     friend ostream& operator<<(ostream& os, const CUDAImage& img){
-
 
         #ifndef __RELEASE__
         uint32_t temp;
@@ -303,7 +292,7 @@ public:
         return os;
     }
 
-
+    // read
     friend istream& operator>>(istream& is, CUDAImage& img){
         #ifndef __RELEASE__
         is.unsetf(ios::dec);
@@ -375,7 +364,6 @@ public:
         _widht = _height = 0;
     }
 
-    // 10000
     // make filration
     void cuda_filter_img(){
         // device data
@@ -469,7 +457,7 @@ public:
         throw_on_cuda_error(cudaFreeArray(a_data));
     }
 
-
+    // make classsification by points
     void cuda_classify_pixels(const vector<vector<uint32_t>>& indexes){
         class_data cov_avg[MAX_CLASS_NUMBERS];
 
@@ -545,6 +533,13 @@ private:
         return ans;
     }
 
+    static uint32_t clear_alpha(uint32_t num){
+        uint32_t mask = 0;
+        --mask;
+        mask >>= 8;
+        return num & mask;
+    }
+
     void compute_conv_avg(class_data* cov_avg, const vector<vector<uint32_t>>& indexes){
         // for all classes
         for(uint32_t i = 0; i < indexes.size(); ++i){
@@ -554,6 +549,7 @@ private:
 
             double cov[9];
             memset(cov, 0, sizeof(double)*9);
+            double D = 0.0;
             
             // npj
             uint32_t size = indexes[i].size() >> 1;
@@ -564,43 +560,17 @@ private:
                 // read pixel and update alpha if exist
                 if(_transpose){
                     pixel = _data[indexes[i][j]*_widht + indexes[i][j+1]];
-                    
-                    uint8_t alpha = i;
-                    pixel ^= ((uint32_t)alpha) << 24;
-                    _data[indexes[i][j]*_widht + indexes[i][j+1]] = pixel;
-                    
                 }else{
                     pixel = _data[indexes[i][j+1]*_widht + indexes[i][j]];
-                    
-                    uint8_t alpha = i;
-                    pixel ^= ((uint32_t)alpha) << 24;
-                    _data[indexes[i][j+1]*_widht + indexes[i][j]] = pixel;
-                    
                 }
                 avg_red += (double) (RED(pixel)); 
                 avg_green += (double) (GREEN(pixel));
                 avg_blue += (double) (BLUE(pixel)); 
-                /*
-                cout << "r[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (RED(pixel));
-                cout << endl;
-                cout << "g[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (GREEN(pixel));
-                cout << endl;
-                cout << "b[" <<  indexes[i][j+1] << ", " << indexes[i][j] << "] = ";
-                cout << (BLUE(pixel));
-                cout << endl;
-                */
             }
             
             avg_red /= size;
             avg_green /= size;
             avg_blue /= size;
-
-            
-            cout << "Class #" << i << endl;
-            cout << "Avg:" << endl;
-            cout << avg_red << " " << avg_green << " " << avg_blue << endl;
             
 
             cov_avg[i].avg_red = (float) avg_red;
@@ -649,7 +619,7 @@ private:
             cov[8] /= size - 1;
 
             // compute back:
-            back_matrix(cov);
+            back_matrix(cov, D);
 
             cov_avg[i].cov11 = (float) cov[0];
             cov_avg[i].cov12 = (float) cov[1];
@@ -662,29 +632,15 @@ private:
             cov_avg[i].cov31 = (float) cov[6];
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
-            
-            cout << "Cov-1:" << endl;
-            cout << cov[0] << " " << cov[1] << " " << cov[2] << endl;
-            cout << cov[3] << " " << cov[4] << " " << cov[5] << endl;
-            cout << cov[6] << " " << cov[7] << " " << cov[8] << endl;
-            cout << endl;
 
 
-            // compute log modulo:
-            cov_avg[i].log_cov = log_of_modulo(cov);
+            // compute log of modulo:
+            D = D > 0 ? D : -D;
+            cov_avg[i].log_det = (float) log(D);
         }
     }
 
-    static float log_of_modulo(double* matr){
-        double ans = 0.0;
-        for(int i = 0; i < 9; ++i){
-            ans += matr[i] * matr[i];
-        }
-        // if  |cov|  == 0 => log is wery small number
-        return  (float) log(sqrt(ans));
-    }
-
-    static void back_matrix(double* matr){
+    static void back_matrix(double* matr, double& D){
         double A11 = matr[4]*matr[8] - matr[5]*matr[7];
         double A12 = matr[5]*matr[6] - matr[3]*matr[8];
         double A13 = matr[3]*matr[7] - matr[4]*matr[6];
@@ -697,7 +653,7 @@ private:
         double A32 = matr[2]*matr[3] - matr[0]*matr[5];
         double A33 = matr[0]*matr[4] - matr[1]*matr[3];
 
-        double D = A11 * matr[0] + A12 * matr[1] + A13 * matr[2];
+        D = A11 * matr[0] + A12 * matr[1] + A13 * matr[2];
 
         matr[0] = A11 / D;
         matr[1] = A21 / D;
