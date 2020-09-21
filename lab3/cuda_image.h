@@ -164,7 +164,7 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             #endif
             
             #ifdef __WITH_IMG__
-            if(idx == 20 && y == 10){
+            if(idx == 20 && idy == 10){
                 printf("[%d, %d] = %d", i, j, pixel);
             }
 
