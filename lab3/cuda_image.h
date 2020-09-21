@@ -164,6 +164,10 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             #endif
             
             #ifdef __WITH_IMG__
+            if(idx == 20 && y == 10){
+                printf("[%d, %d] = %d", i, j, pixel);
+            }
+
             uint32_t color1 = (uint32_t) computation_data[ans_c].avg_red;
             uint32_t color2 = (uint32_t) computation_data[ans_c].avg_green;
             uint32_t color3 = (uint32_t) computation_data[ans_c].avg_blue;
