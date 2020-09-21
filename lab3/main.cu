@@ -35,6 +35,8 @@ int main(){
 
     if(!fin || !fout){
         cout << "ERROR: " << "Cant open file" << endl;
+        fin.close();
+        fout.close();
         return 0;
     }
 
@@ -42,14 +44,10 @@ int main(){
 
     try{
         img.cuda_classify_pixels(points);
+        fout << img;
     }catch(std::runtime_error &exception){
         cout << "ERROR: " << exception.what() << endl;
-        fout.close();
-        fin.close();
-        return 0;
     }
-
-    fout << img;
 
     fout.close();
     fin.close();
