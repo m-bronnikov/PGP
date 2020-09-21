@@ -5,21 +5,27 @@
 #include <iostream>
 #include <iomanip>
 #include <string.h>
-#include <stdio.h>
+#include <cmath>
 #include <stdlib.h>
 #include <string>
 #include <fstream>
 #include <algorithm>
+#include <vector>
 
 using namespace std;
 
 // max threads is 512 in block => sqrt(512) is dim
-#define MAX_X 22
-#define MAX_Y 22
+#define MAX_X 16
+#define MAX_Y 16
+#define BLOCKS_X 32
+#define BLOCKS_Y 32
 
 #define RED(x) (x)&255
 #define GREEN(x) ((x) >> 8)&255
 #define BLUE(x) ((x) >> 16)&255
+#define ALPHA(x) ((x) >> 24)&255
+
+#define MAX_CLASS_NUMBERS 32
 
 #define __RELEASE__
 #define __TIME_COUNT__
@@ -30,51 +36,56 @@ using namespace std;
 // 2 dimentional texture
 texture<uint32_t, 2, cudaReadModeElementType> g_text;
 
+
 // filter(variant #8)
 __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if(idx >= w || idy >= h){
-        return;
-    }
+    uint32_t step_x = blockDim.x * gridDim.x;
+    uint32_t step_y = blockDim.y * gridDim.y;
 
+    for(int32_t i = idx; i < w; i += step_x){
+        for(int32_t j = idy; j < h; j += step_y){
+            // ans pixel
+            uint32_t ans = 0;
 
-    // ans pixel
-    uint32_t ans = 0;
+            // locate area in mem(32 bite)
+            // compute grey scale for all pixels in area
+            float w11 = GREY(tex2D(g_text, i - 1, j - 1));
+            float w12 = GREY(tex2D(g_text, i, j - 1));
+            float w13 = GREY(tex2D(g_text, i + 1, j - 1));
+            float w21 = GREY(tex2D(g_text, i - 1, j));
 
-    // locate area in mem(32 bite)
-    // compute grey scale for all pixels in area
-    float w11 = GREY(tex2D(g_text, idx - 1, idy - 1));
-    float w12 = GREY(tex2D(g_text, idx, idy - 1));
-    float w13 = GREY(tex2D(g_text, idx + 1, idy - 1));
-    float w21 = GREY(tex2D(g_text, idx - 1, idy));
+            float w23 = GREY(tex2D(g_text, i + 1, j));
+            float w31 = GREY(tex2D(g_text, i - 1, j + 1));
+            float w32 = GREY(tex2D(g_text, i, j + 1));
+            float w33 = GREY(tex2D(g_text, i + 1, j + 1));
 
-    float w23 = GREY(tex2D(g_text, idx + 1, idy));
-    float w31 = GREY(tex2D(g_text, idx - 1, idy + 1));
-    float w32 = GREY(tex2D(g_text, idx, idy + 1));
-    float w33 = GREY(tex2D(g_text, idx + 1, idy + 1));
+            // compute Gx Gy
+            float Gx = w13 + w23 + w23 + w33 - w11 - w21 - w21 - w31;
+            float Gy = w31 + w32 + w32 + w33 - w11 - w12 - w12 - w13;
 
-    // compute Gx Gy
-    float Gx = w13 + w23 + w23 + w33 - w11 - w21 - w21 - w31;
-    float Gy = w31 + w32 + w32 + w33 - w11 - w12 - w12 - w13;
-
-    // full gradient
-    int32_t gradf = (int32_t)sqrt(Gx*Gx + Gy*Gy);
-    // max(grad, 255)
+            // full gradient
+            int32_t gradf = (int32_t)sqrt(Gx*Gx + Gy*Gy);
+            // max(grad, 255)
     
-    gradf = gradf > 255 ? 255 : gradf;
-    // store values in variable for minimize work with global mem
-    ans ^= (gradf << 16);
-    ans ^= (gradf << 8);
-    ans ^= (gradf);
+            gradf = gradf > 255 ? 255 : gradf;
+            // store values in variable for minimize work with global mem
+            ans ^= (gradf << 16);
+            ans ^= (gradf << 8);
+            ans ^= (gradf);
 
-    // locate in global mem
-    d_data[idy*w + idx] = ans;
+            // locate in global mem
+            d_data[j*w + i] = ans;
+        }
+    }
 }
 
+
+
 // exceptions if error
-void throw_on_cuda_error(cudaError_t code)
+void throw_on_cuda_error(const cudaError_t& code)
 {
   if(code != cudaSuccess)
   {
@@ -94,7 +105,7 @@ public:
         ifstream fin(path, ios::in | ios::binary);
         if(!fin.is_open()){
             cout << "ERROR" << endl;
-            throw std::runtime_error("cant open file!");
+            throw std::runtime_error("Can't open file!");
         }
 
         fin >> (*this);
@@ -107,9 +118,8 @@ public:
         _height = _widht = 0;
     }
 
-    // out is not parallel because order is important
+    // write 
     friend ostream& operator<<(ostream& os, const CUDAImage& img){
-
 
         #ifndef __RELEASE__
         uint32_t temp;
@@ -189,7 +199,7 @@ public:
         return os;
     }
 
-
+    // read
     friend istream& operator>>(istream& is, CUDAImage& img){
         #ifndef __RELEASE__
         is.unsetf(ios::dec);
@@ -261,7 +271,6 @@ public:
         _widht = _height = 0;
     }
 
-    // 10000
     // make filration
     void cuda_filter_img(){
         // device data
@@ -301,15 +310,8 @@ public:
         g_text.addressMode[1] = cudaAddressModeClamp;
         // cout << cudaAddressModeClamp << cudaAddressModeWrap << endl;
 
-
-        uint32_t bloks_x = _height / MAX_X;
-        uint32_t bloks_y = _widht / MAX_Y;
-
-        bloks_x += bloks_x * MAX_X < _height ? 1 : 0;
-        bloks_y += bloks_y * MAX_Y < _widht ? 1 : 0;
-
         dim3 threads = dim3(MAX_X, MAX_Y);
-        dim3 blocks = dim3(bloks_y, bloks_x);
+        dim3 blocks = dim3(BLOCKS_X, BLOCKS_Y);
 
 
         #ifdef __TIME_COUNT__
@@ -320,8 +322,8 @@ public:
         cudaEventRecord(start, 0);
         #endif
 
-	sobel<<<blocks, threads>>>(d_data, _height, _widht);
-	throw_on_cuda_error(cudaGetLastError());
+	    sobel<<<blocks, threads>>>(d_data, _height, _widht);
+	    throw_on_cuda_error(cudaGetLastError());
 
 
         #ifdef __TIME_COUNT__
@@ -331,10 +333,10 @@ public:
 
         // open log:
         ofstream log("logs.log", ios::app);
-        // title
-        log << "GPU threads: " << MAX_X * MAX_Y << endl;
+        // threads
+        log << BLOCKS_X * BLOCKS_Y * MAX_X * MAX_Y << endl;
         // size:
-        log << _height << " " << _widht << endl;
+        log << _height * _widht << endl;
         // time:
         log << gpu_time << endl;
         log.close();
@@ -353,7 +355,6 @@ public:
         throw_on_cuda_error(cudaUnbindTexture(g_text));
         throw_on_cuda_error(cudaFree(d_data));
         throw_on_cuda_error(cudaFreeArray(a_data));
-
     }
 
 
@@ -367,6 +368,7 @@ private:
         }
         return ans;
     }
+
 
     uint32_t* _data;
     uint32_t _height;

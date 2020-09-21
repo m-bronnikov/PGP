@@ -25,13 +25,11 @@ using namespace std;
 #define BLUE(x) ((x) >> 16)&255
 #define ALPHA(x) ((x) >> 24)&255
 
-
-
 #define MAX_CLASS_NUMBERS 32
 
 #define __RELEASE__
-#define __NOT_TIME_COUNT__
-#define __NOT_WITH_IMG__
+#define __TIME_COUNT__
+#define __WITH_IMG__
 
 #define GREY(x) 0.299*((float)((x)&255)) + 0.587*((float)(((x)>>8)&255)) + 0.114*((float)(((x)>>16)&255))
 
@@ -45,41 +43,44 @@ __global__ void sobel(uint32_t* d_data, uint32_t h, uint32_t w){
     int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if(idx >= w || idy >= h){
-        return;
-    }
+    uint32_t step_x = blockDim.x * gridDim.x;
+    uint32_t step_y = blockDim.y * gridDim.y;
 
-    // ans pixel
-    uint32_t ans = 0;
+    for(uint32_t i = idx; i < w; i += step_x){
+        for(uint32_t j = idy; j < h; j += step_y){
+            // ans pixel
+            uint32_t ans = 0;
 
-    // locate area in mem(32 bite)
-    // compute grey scale for all pixels in area
-    float w11 = GREY(tex2D(g_text, idx - 1, idy - 1));
-    float w12 = GREY(tex2D(g_text, idx, idy - 1));
-    float w13 = GREY(tex2D(g_text, idx + 1, idy - 1));
-    float w21 = GREY(tex2D(g_text, idx - 1, idy));
+            // locate area in mem(32 bite)
+            // compute grey scale for all pixels in area
+            float w11 = GREY(tex2D(g_text, i - 1, j - 1));
+            float w12 = GREY(tex2D(g_text, i, j - 1));
+            float w13 = GREY(tex2D(g_text, i + 1, j - 1));
+            float w21 = GREY(tex2D(g_text, i - 1, j));
 
-    float w23 = GREY(tex2D(g_text, idx + 1, idy));
-    float w31 = GREY(tex2D(g_text, idx - 1, idy + 1));
-    float w32 = GREY(tex2D(g_text, idx, idy + 1));
-    float w33 = GREY(tex2D(g_text, idx + 1, idy + 1));
+            float w23 = GREY(tex2D(g_text, i + 1, j));
+            float w31 = GREY(tex2D(g_text, i - 1, j + 1));
+            float w32 = GREY(tex2D(g_text, i, j + 1));
+            float w33 = GREY(tex2D(g_text, i + 1, j + 1));
 
-    // compute Gx Gy
-    float Gx = w13 + w23 + w23 + w33 - w11 - w21 - w21 - w31;
-    float Gy = w31 + w32 + w32 + w33 - w11 - w12 - w12 - w13;
+            // compute Gx Gy
+            float Gx = w13 + w23 + w23 + w33 - w11 - w21 - w21 - w31;
+            float Gy = w31 + w32 + w32 + w33 - w11 - w12 - w12 - w13;
 
-    // full gradient
-    int32_t gradf = (int32_t)sqrt(Gx*Gx + Gy*Gy);
-    // max(grad, 255)
+            // full gradient
+            int32_t gradf = (int32_t)sqrt(Gx*Gx + Gy*Gy);
+            // max(grad, 255)
     
-    gradf = gradf > 255 ? 255 : gradf;
-    // store values in variable for minimize work with global mem
-    ans ^= (gradf << 16);
-    ans ^= (gradf << 8);
-    ans ^= (gradf);
+            gradf = gradf > 255 ? 255 : gradf;
+            // store values in variable for minimize work with global mem
+            ans ^= (gradf << 16);
+            ans ^= (gradf << 8);
+            ans ^= (gradf);
 
-    // locate in global mem
-    d_data[idy*w + idx] = ans;
+            // locate in global mem
+            d_data[j*w + i] = ans;
+        }
+    }
 }
 
 
@@ -103,7 +104,7 @@ struct class_data{
     float log_det;
 };
 
-
+// constant memory
 __constant__ class_data computation_data[MAX_CLASS_NUMBERS];
 
 
@@ -403,15 +404,8 @@ public:
         g_text.addressMode[1] = cudaAddressModeClamp;
         // cout << cudaAddressModeClamp << cudaAddressModeWrap << endl;
 
-
-        uint32_t bloks_x = _height / MAX_X;
-        uint32_t bloks_y = _widht / MAX_Y;
-
-        bloks_x += bloks_x * MAX_X < _height ? 1 : 0;
-        bloks_y += bloks_y * MAX_Y < _widht ? 1 : 0;
-
         dim3 threads = dim3(MAX_X, MAX_Y);
-        dim3 blocks = dim3(bloks_y, bloks_x);
+        dim3 blocks = dim3(BLOCKS_X, BLOCKS_Y);
 
 
         #ifdef __TIME_COUNT__
@@ -433,10 +427,10 @@ public:
 
         // open log:
         ofstream log("logs.log", ios::app);
-        // title
-        log << "GPU threads: " << MAX_X * MAX_Y << endl;
+        // threads
+        log << BLOCKS_X * BLOCKS_Y * MAX_X * MAX_Y << endl;
         // size:
-        log << _height << " " << _widht << endl;
+        log << _height * _widht << endl;
         // time:
         log << gpu_time << endl;
         log.close();
