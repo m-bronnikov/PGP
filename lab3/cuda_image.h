@@ -165,7 +165,7 @@ __global__ void classification(uint32_t* picture, uint32_t h, uint32_t w, uint8_
             
             #ifdef __WITH_IMG__
             if(idx == 20 && idy == 10){
-                printf("[%d, %d] = %d", i, j, pixel);
+                printf("[%d, %d] = %d\n", i, j, pixel);
             }
 
             uint32_t color1 = (uint32_t) computation_data[ans_c].avg_red;
@@ -597,10 +597,11 @@ private:
             avg_green /= size;
             avg_blue /= size;
 
-            /*
-            cout << "Class #" << i << " ";
+            
+            cout << "Class #" << i << endl;
+            cout << "Avg:"
             cout << avg_red << " " << avg_green << " " << avg_blue << endl;
-            */
+            
 
             cov_avg[i].avg_red = (float) avg_red;
             cov_avg[i].avg_green = (float) avg_green;
@@ -661,11 +662,12 @@ private:
             cov_avg[i].cov31 = (float) cov[6];
             cov_avg[i].cov32 = (float) cov[7];
             cov_avg[i].cov33 = (float) cov[8];
-            /*
+            
+            cout << "Cov-1:" << endl;
             cout << cov[0] << " " << cov[1] << " " << cov[2] << endl;
             cout << cov[3] << " " << cov[4] << " " << cov[5] << endl;
             cout << cov[6] << " " << cov[7] << " " << cov[8] << endl;
-            */
+            cout << endl;
 
 
             // compute log modulo:
