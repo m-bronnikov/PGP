@@ -12,19 +12,21 @@
 using namespace std;
 
 #define  MAXDELTA 10000
-#define MAXPTHS 1024
+#define MAXPTHS 512
+#define BLOCKS 256 // 1048576
 
 #define __DEBUG__
 
 template<typename T>
-__global__ void elem_min(T* d_left, T* d_right, T* d_ans, int size){
+__global__ void elem_min(T* d_left, T* d_right, int size){
     int idx = blockDim.x * blockIdx.x +  threadIdx.x;
-    if(idx >= size){
-        return;
+    int step = blockDim.x * gridDim.x;
+
+    for(int i = idx; i < size; i += step){
+        T l_v = d_left[i];
+        T r_v = d_right[i];
+        d_left[i] = l_v < r_v ? l_v : r_v;
     }
-    T l_v = d_left[idx];
-    T r_v = d_right[idx];
-    d_ans[idx] = l_v < r_v ? l_v : r_v;
 }
 
 template<typename T>
@@ -110,19 +112,34 @@ public:
         // CUDA mem alloc
         T* d_left;
         T* d_right;
-        T* d_ans;
+        //T* d_ans;
 
-        cudaMalloc((void**) &d_left, sizeof(T) * left._size);
-        cudaMalloc((void**) &d_right, sizeof(T) * right._size);
-        cudaMalloc((void**) &d_ans, sizeof(T) * ans._size);
+        cudaError_t err = cudaMalloc((void**) &d_left, sizeof(T) * left._size);
+        if (err != cudaSuccess){
+            printf("ERROR: %s\n", cudaGetErrorString(err));
+            exit(0);
+        }
+
+        err = cudaMalloc((void**) &d_right, sizeof(T) * right._size);
+        if (err != cudaSuccess){
+            printf("ERROR: %s\n", cudaGetErrorString(err));
+            exit(0);
+        }
+        //cudaMalloc((void**) &d_ans, sizeof(T) * ans._size);
 
         // cpy mem to device
-        cudaMemcpy(d_left, left._data, sizeof(T) * left._size, cudaMemcpyHostToDevice);
-        cudaMemcpy(d_right, right._data, sizeof(T) * right._size, cudaMemcpyHostToDevice);
+        err = cudaMemcpy(d_left, left._data, sizeof(T) * left._size, cudaMemcpyHostToDevice);
+        if (err != cudaSuccess){
+            printf("ERROR: %s\n", cudaGetErrorString(err));
+            exit(0);
+        }
 
-        // start ans.size kernels for parallel work on threads
-        int blocks = ans._size / MAXPTHS;
-        int plus_one = (ans._size == MAXPTHS * blocks) ? 0 : 1;
+        err = cudaMemcpy(d_right, right._data, sizeof(T) * right._size, cudaMemcpyHostToDevice);
+        if (err != cudaSuccess){
+            printf("ERROR: %s\n", cudaGetErrorString(err));
+            exit(0);
+        }
+
 
         #ifdef __DEBUG__
         cudaEvent_t start, stop;
@@ -132,7 +149,13 @@ public:
         cudaEventRecord(start, 0);
         #endif
 
-        elem_min<<<blocks + plus_one, MAXPTHS>>>(d_left, d_right, d_ans, ans._size);
+        elem_min<<<BLOCKS, MAXPTHS>>>(d_left, d_right, ans._size);
+        err = cudaGetLastError();
+        // check errors
+        if (err != cudaSuccess){
+            printf("ERROR: %s\n", cudaGetErrorString(err));
+            exit(0);
+        }
 
         #ifdef __DEBUG__
         cudaEventRecord(stop, 0);
@@ -142,7 +165,7 @@ public:
         // open log:
         ofstream log("logs.log", ios::app);
         // title
-        log << "GPU threads: " << MAXPTHS << endl;
+        log << MAXPTHS * BLOCKS << endl;
         // size:
         log << ans._size << endl;
         // time:
@@ -150,21 +173,24 @@ public:
         log.close();
         #endif
 
-
-        cudaError_t err = cudaGetLastError();
-        // check errors
+        // get ans from devise
+        err = cudaMemcpy(ans._data, d_left, sizeof(T) * ans._size, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess){
             printf("ERROR: %s\n", cudaGetErrorString(err));
             exit(0);
         }
 
-        // get ans from devise
-        cudaMemcpy(ans._data, d_ans, sizeof(T) * ans._size, cudaMemcpyDeviceToHost);
-
         // free mem
-        cudaFree(d_left);
-        cudaFree(d_right);
-        cudaFree(d_ans);
+        err = cudaFree(d_left);
+        if (err != cudaSuccess){
+            printf("ERROR: %s\n", cudaGetErrorString(err));
+            exit(0);
+        }
+        err = cudaFree(d_right);
+        if (err != cudaSuccess){
+            printf("ERROR: %s\n", cudaGetErrorString(err));
+            exit(0);
+        }
     }
 
 private:
