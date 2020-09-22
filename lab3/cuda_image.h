@@ -15,8 +15,8 @@
 using namespace std;
 
 // max threads is 512 in block => sqrt(512) is dim
-#define MAX_X 32
-#define MAX_Y 32
+#define MAX_X 4
+#define MAX_Y 4
 #define BLOCKS_X 32
 #define BLOCKS_Y 32
 
@@ -496,10 +496,11 @@ public:
         cudaEventElapsedTime(&gpu_time, start, stop);
         // open log:
         ofstream log("logs.log", ios::app);
-        // title
-        log  << BLOCKS_X * BLOCKS_Y * MAX_X * MAX_Y << endl;
+        // threads
+        log << "<<<(" << BLOCKS_X << ", " << BLOCKS_Y << "), ("; 
+        log << MAX_X << ", " << MAX_Y << ")>>>" << endl;
         // size:
-        log << _widht * _height << endl;
+        log << _height << " " << _widht << endl;
         // time:
         log << gpu_time << endl;
         log.close();
