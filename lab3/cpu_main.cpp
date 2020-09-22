@@ -143,8 +143,5 @@ int main(){
     fout << ((double)duration_cast<microseconds>(end - start).count()) / 1000.0 << endl;
     fout.close();
 
-
-
-
     return 0;
 }

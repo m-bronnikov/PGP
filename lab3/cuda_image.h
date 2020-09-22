@@ -15,8 +15,8 @@
 using namespace std;
 
 // max threads is 512 in block => sqrt(512) is dim
-#define MAX_X 16
-#define MAX_Y 16
+#define MAX_X 32
+#define MAX_Y 32
 #define BLOCKS_X 32
 #define BLOCKS_Y 32
 
@@ -428,9 +428,10 @@ public:
         // open log:
         ofstream log("logs.log", ios::app);
         // threads
-        log << BLOCKS_X * BLOCKS_Y * MAX_X * MAX_Y << endl;
+        log << "<<<(" BLOCKS_X << ", " BLOCKS_Y << "), ("; 
+        log << MAX_X << ", " MAX_Y << ")>>>" << endl;
         // size:
-        log << _height * _widht << endl;
+        log << _height << " " << _widht << endl;
         // time:
         log << gpu_time << endl;
         log.close();
