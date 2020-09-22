@@ -428,8 +428,8 @@ public:
         // open log:
         ofstream log("logs.log", ios::app);
         // threads
-        log << "<<<(" BLOCKS_X << ", " BLOCKS_Y << "), ("; 
-        log << MAX_X << ", " MAX_Y << ")>>>" << endl;
+        log << "<<<(" << BLOCKS_X << ", " << BLOCKS_Y << "), ("; 
+        log << MAX_X << ", " << MAX_Y << ")>>>" << endl;
         // size:
         log << _height << " " << _widht << endl;
         // time:
