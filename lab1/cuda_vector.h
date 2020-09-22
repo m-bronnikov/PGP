@@ -12,8 +12,8 @@
 using namespace std;
 
 #define  MAXDELTA 10000
-#define MAXPTHS 512
-#define BLOCKS 256 // 1048576
+#define MAXPTHS 1024
+#define BLOCKS 4096 // 1048576
 
 #define __DEBUG__
 
