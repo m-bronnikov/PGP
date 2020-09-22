@@ -451,7 +451,7 @@ public:
         throw_on_cuda_error(cudaFreeArray(a_data));
     }
 
-    // make classsification by points
+    // make classsification by points on gpu
     void cuda_classify_pixels(const vector<vector<uint32_t>>& indexes){
         class_data cov_avg[MAX_CLASS_NUMBERS];
 
@@ -514,6 +514,7 @@ public:
 
         throw_on_cuda_error(cudaFree(d_data));
     }
+
 
 
 private:
