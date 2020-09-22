@@ -83,7 +83,7 @@ int main(){
     sobel_cpu(img, out);
     auto end = steady_clock::now();
     fout << "CPU" << endl;
-    fout << h << " " << w << endl;
+    fout << h * w << endl;
     fout << ((double)duration_cast<microseconds>(end - start).count()) / 1000.0 << endl;
     fout.close();
 
