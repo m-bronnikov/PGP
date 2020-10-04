@@ -18,6 +18,7 @@ int main() {
         printf("start itter: %d \n", i);
         kernel<<<2, 2>>>(i);
     }
+    cudaThreadSynchronize();
         
 	printf("\n");
 	return 0;
