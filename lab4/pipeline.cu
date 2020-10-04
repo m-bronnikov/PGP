@@ -25,7 +25,17 @@ void throw_on_cuda_error(const cudaError_t& code, int itter){
     }
 }
 
-__global__ void gauss_step(double* C, unsigned* p, unsigned n, unsigned col, double max_elem){
+__global__ void gauss_step_L(double* C, unsigned* p, unsigned n, unsigned col, double max_elem){
+    unsigned thrd_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned thrd_step = blockDim.x * gridDim.x;
+
+    for(unsigned index = thrd_idx + col + 1; index < n; index += thrd_step){
+        unsigned real_i = p[index]; // row in C defined by permutation matrix
+        C[n*col + real_i] /= max_elem;
+    }
+}
+
+__global__ void gauss_step_U(double* C, unsigned* p, unsigned n, unsigned col, double max_elem){
     unsigned thrd_idx = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned thrd_step = blockDim.x * gridDim.x;
 
@@ -35,17 +45,11 @@ __global__ void gauss_step(double* C, unsigned* p, unsigned n, unsigned col, dou
         unsigned virt_i = index - n*j;
         unsigned real_i = p[virt_i]; // row in C defined by permutation matrix
     
-        if(j < col || virt_i <= col){
+        if(j <= col || virt_i <= col){
             continue;
         }
 
-        double koeff = C[n*col + real_i] / max_elem;
-        // if j == col => update L
-        if(j == col){
-            C[n*j + real_i] = koeff;
-        }else{ // else update U
-            C[n*j + real_i] -= koeff * C[n*j + p[col]];
-        }
+        C[n*j + real_i] -= C[n*col + real_i] * C[n*j + p[col]];
     }
 }
 
@@ -85,7 +89,7 @@ int main(){
             auto it_beg = make_permutation_iterator(d_C.begin() + i*n, d_p.begin());
             auto it_end = make_permutation_iterator(d_C.begin() + i*n, d_p.end());
 
-            auto max_elem = max_element(it_beg + i, it_end);
+            auto max_elem = thrust::max_element(it_beg + i, it_end);
             unsigned max_idx = max_elem - it_beg;
             double max_val = *max_elem;
 
@@ -96,12 +100,16 @@ int main(){
                 d_p[max_idx] = temp;
             }
 
-            h_ansvec[i] = max_idx;
-
-            gauss_step<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, max_val);
+            gauss_step_L<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, max_val);
             throw_on_cuda_error(cudaGetLastError(), i);
 
-            throw_on_cuda_error(cudaThreadSynchronize(), i);
+            gauss_step_U<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, max_val);
+
+            h_ansvec[i] = max_idx;
+            
+            throw_on_cuda_error(cudaGetLastError(), i);
+
+            //throw_on_cuda_error(cudaThreadSynchronize(), i);
         }
     }catch(runtime_error& err){
         cout << "ERROR: " << err.what() << endl;
@@ -109,14 +117,6 @@ int main(){
 
     h_C = d_C;
     h_p = d_p;
-
-    /*
-    // get true order for output:
-    map<unsigned, unsigned> order;
-    for(unsigned i = 0; i < n; ++i){
-        order[h_p[i]] = i;
-    }
-    */
 
     // output for matrix:
     cout << std::scientific << std::setprecision(10);
