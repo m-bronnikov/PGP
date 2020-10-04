@@ -126,6 +126,14 @@ int main(){
         }
         cout << endl;
     }
+    // output of vector
+    for(unsigned i = 0; i < n; ++i){
+        if(i){
+            cout << " ";
+        }
+        cout << h_ansvec[i] << " ";
+    }
+    cout << endl;
 
     return 0;
 }
