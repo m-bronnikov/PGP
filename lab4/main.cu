@@ -119,7 +119,7 @@ int main(){
             strided_range<thrust::device_vector<double>::iterator> 
                 range(d_C.begin() + i, d_C.end(), align); // create iterator
 
-            auto max_elem = thrust::max_element(range.begin(), range.end());
+            auto max_elem = thrust::max_element(range.begin() + i, range.end());
             unsigned max_idx = max_elem - range.begin();
             double max_val = *max_elem;
 
