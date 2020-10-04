@@ -7,6 +7,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <iomanip>
 
 using namespace std;
 using namespace thrust;
