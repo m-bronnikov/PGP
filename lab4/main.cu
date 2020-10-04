@@ -4,6 +4,7 @@
 #include <thrust/functional.h>
 #include <thrust/swap.h>
 #include <thrust/extrema.h>
+#include <thrust/execution_policy.h>
 #include "strided_range.h"
 #include <iostream>
 #include <map>
@@ -52,7 +53,7 @@ __global__ void gauss_step_U(double* C, unsigned n, unsigned size,
 
         // first itter may be not full
         unsigned j = thrd_idx + starting_point_thrd;
-        
+
         if(thrd_idx + starting_point_thrd > col){
             C[i*size + j] -= coeff * C[col*size + j];
         }
