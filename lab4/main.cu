@@ -38,8 +38,6 @@ __global__ void gauss_step(double* C, unsigned* p, unsigned n, unsigned col, dou
             continue;
         }
 
-        //printf("[ri:%d, vi:%d] = %f\n", real_i, virt_i, C[n*col + real_i]);
-
         double koeff = C[n*col + real_i] / max_elem;
         // if j == col => update L
         if(j == col){
@@ -98,7 +96,6 @@ int main(){
             }
 
             h_ansvec[i] = max_idx;
-            //cout << "Max idx:" << max_idx << " max val:" << max_val << endl;
 
             gauss_step<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, max_val);
             throw_on_cuda_error(cudaGetLastError(), i);
@@ -121,6 +118,7 @@ int main(){
     */
 
     // output for matrix:
+    cout << std::scientific << std::setprecision(10);
     for(unsigned i = 0; i < n; ++i){
         for(unsigned j = 0; j < n; ++j){
             if(j){
