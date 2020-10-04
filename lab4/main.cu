@@ -98,9 +98,9 @@ int main(){
             }
 
             h_ansvec[i] = max_idx;
-            cout << "Max idx:" << max_idx << " max val:" << *max_val << endl;
+            cout << "Max idx:" << max_idx << " max val:" << max_val << endl;
 
-            gauss_step<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, *max_val);
+            gauss_step<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, max_val);
             throw_on_cuda_error(cudaGetLastError(), i);
 
             throw_on_cuda_error(cudaThreadSynchronize(), i);
