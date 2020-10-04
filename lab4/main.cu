@@ -38,7 +38,7 @@ __global__ void gauss_step(double* C, unsigned* p, unsigned n, unsigned col, dou
             continue;
         }
 
-        printf("[ri:%d, vi:%d] = %f\n", real_i, virt_i, C[n*col + real_i]);
+        //printf("[ri:%d, vi:%d] = %f\n", real_i, virt_i, C[n*col + real_i]);
 
         double koeff = C[n*col + real_i] / max_elem;
         // if j == col => update L
@@ -98,7 +98,7 @@ int main(){
             }
 
             h_ansvec[i] = max_idx;
-            cout << "Max idx:" << max_idx << " max val:" << max_val << endl;
+            //cout << "Max idx:" << max_idx << " max val:" << max_val << endl;
 
             gauss_step<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, max_val);
             throw_on_cuda_error(cudaGetLastError(), i);
@@ -112,21 +112,22 @@ int main(){
     h_C = d_C;
     h_p = d_p;
 
+    /*
     // get true order for output:
     map<unsigned, unsigned> order;
     for(unsigned i = 0; i < n; ++i){
         order[h_p[i]] = i;
     }
+    */
 
     // output for matrix:
     for(unsigned i = 0; i < n; ++i){
-        unsigned row_num = order[i];
         for(unsigned j = 0; j < n; ++j){
             if(j){
                 cout << " ";
             }
 
-            cout << h_C[j*n + row_num];
+            cout << h_C[j*n + h_p[i]];
         }
         cout << endl;
     }
