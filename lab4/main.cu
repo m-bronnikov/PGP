@@ -31,8 +31,8 @@ __global__ void gauss_step(double* C, unsigned* p, unsigned n, unsigned col, dou
     unsigned limit = n*n;
     for(unsigned index = thrd_idx; index < limit; index += thrd_step){
         unsigned j = index / n; // column in C
-        unsigned real_i = index - n*j;
-        unsigned virt_i = p[real_i]; // row in C defined by permutation matrix
+        unsigned virt_i = index - n*j;
+        unsigned real_i = p[virt_i]; // row in C defined by permutation matrix
     
         if(j < col || virt_i <= col){
             continue;
