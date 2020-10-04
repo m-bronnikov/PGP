@@ -88,6 +88,7 @@ int main(){
 
             auto max_elem = max_element(it_beg + i, it_end);
             unsigned max_idx = max_elem - it_beg;
+            double max_val = *max_elem;
 
             //swap(d_p[i], d_p[max_idx])
             {
@@ -97,9 +98,9 @@ int main(){
             }
 
             h_ansvec[i] = max_idx;
-            cout << "Max idx:" << max_idx << " max val:" << *max_elem << endl;
+            cout << "Max idx:" << max_idx << " max val:" << *max_val << endl;
 
-            gauss_step<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, *max_elem);
+            gauss_step<<<BLOCKS, THREADS>>>(raw_C, raw_p, n, i, *max_val);
             throw_on_cuda_error(cudaGetLastError(), i);
 
             throw_on_cuda_error(cudaThreadSynchronize(), i);
