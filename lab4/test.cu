@@ -4,12 +4,12 @@
 __global__ void kernel(int i) {
 	int jdx = blockIdx.x;			// Абсолютный номер потока
     int idx = threadIdx.x;					// Общее кол-во потоков
-    if(!i){
-        for(int j = 0; j < 100000000000; ++j){
+    if(i == 0){
+        for(int j = 0; j < 10000000; ++j){
             continue;
         }
     }
-    printf("[%d, %d] = %d", idx, jdx, i);
+    printf("[%d, %d] = %d\n", idx, jdx, i);
 }
 
 int main() {
