@@ -38,6 +38,8 @@ __global__ void gauss_step(double* C, unsigned* p, unsigned n, unsigned col, dou
             continue;
         }
 
+        printf("[ri:%d, vi:%d] = %f\n", real_i, virt_i, C[n*col + real_i]);
+
         double koeff = C[n*col + real_i] / max_elem;
         // if j == col => update L
         if(j == col){
@@ -63,14 +65,14 @@ int main(){
 
     // input of matrix
     for(unsigned i = 0; i < n; ++i){
-        h_p[i] = i; // init of permutation vector
+        h_ansvec[i] = i; // init of permutation vector
         for(unsigned j = 0; j < n; ++j){
             cin >> h_C[j*n + i]; // we store need matrix in  transpose format here for easy thrust search
         }
     }
 
     // transporting mem to device:
-    d_p = h_p;
+    d_p = h_ansvec;
     d_C = h_C;
 
     // pointers to mem:
