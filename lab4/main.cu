@@ -50,7 +50,14 @@ __global__ void gauss_step_U(double* C, unsigned n, unsigned size,
     for(unsigned i = blck_idx + starting_point_blck; i < n; i += blck_step){
         double coeff = C[i*size + col]; // get coeff
 
-        for(unsigned j = thrd_idx + starting_point_thrd; j < n; j+= thrd_step){
+        // first itter may be not full
+        unsigned j = thrd_idx + starting_point_thrd;
+        
+        if(thrd_idx + starting_point_thrd > col){
+            C[i*size + j] -= coeff * C[col*size + j];
+        }
+
+        for(j += thrd_step; j < n; j+= thrd_step){
             C[i*size + j] -= coeff * C[col*size + j];
         }
     }
@@ -109,7 +116,7 @@ int main(){
     try{
         for(unsigned i = 0; i < n - 1; ++i){
             strided_range<thrust::device_vector<double>::iterator> 
-                range(d_C.begin(), d_C.end(), n); // create iterator
+                range(d_C.begin(), d_C.end(), align); // create iterator
 
             auto max_elem = thrust::max_element(range.begin(), range.end());
             unsigned max_idx = max_elem - range.begin();
