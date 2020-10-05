@@ -28,6 +28,13 @@ void throw_on_cuda_error(const cudaError_t& code, int itter){
     }
 }
 
+struct abs_functor{
+    __host__ __device__
+    double operator()(double elem) const {
+        return elem < 0 ? -elem : elem;
+    }
+};
+
 __global__ void gauss_step_L(double* C,  unsigned n, unsigned size, 
                                             unsigned col, double max_elem){
     unsigned thrd_idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -120,13 +127,10 @@ int main(){
             strided_range<thrust::device_vector<double>::iterator> 
                 range(d_C.begin() + i, d_C.end(), align); // create iterator
 
-            auto abs_func = [] __device__ __host__ (double elem){
-                return elem < 0 ? -elem : elem;
-            };
 
             auto max_elem = thrust::max_element(
-                make_transform_iterator(range.begin() + i, abs_func), 
-                make_transform_iterator(range.end(), abs_func)
+                make_transform_iterator(range.begin() + i, abs_functor()), 
+                make_transform_iterator(range.end(), abs_functor())
             );
 
             unsigned max_idx = max_elem - range.begin();
