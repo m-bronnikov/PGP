@@ -33,7 +33,7 @@ struct abs_functor : public thrust::unary_function<double, double>{
 
     __host__ __device__
     double operator()(double elem) const {
-        return elem < 0 ? -elem : elem;
+        return elem < 0.0 ? -elem : elem;
     }
 };
 
@@ -64,7 +64,7 @@ __global__ void gauss_step_U(double* C, unsigned n, unsigned size,
         // first itter may be not full
         unsigned j = thrd_idx + starting_point_thrd;
 
-        if(thrd_idx + starting_point_thrd > col){
+        if(j > col && j < n){
             C[i*size + j] -= coeff * C[col*size + j];
         }
 
