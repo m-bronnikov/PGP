@@ -122,7 +122,7 @@ int main(){
 
             auto abs_func = [] __device__ __host__ (double elem){
                 return elem < 0 ? -elem : elem;
-            }
+            };
 
             auto max_elem = thrust::max_element(
                 make_transform_iterator(range.begin() + i, abs_func), 
