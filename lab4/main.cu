@@ -5,6 +5,7 @@
 #include <thrust/swap.h>
 #include <thrust/extrema.h>
 #include <thrust/execution_policy.h>
+#include <thrust/iterator/transform_iterator.h>
 #include "strided_range.h"
 #include <iostream>
 #include <map>
@@ -119,7 +120,15 @@ int main(){
             strided_range<thrust::device_vector<double>::iterator> 
                 range(d_C.begin() + i, d_C.end(), align); // create iterator
 
-            auto max_elem = thrust::max_element(range.begin() + i, range.end());
+            auto abs_func = [] __device__ __host__ (double elem){
+                return elem < 0 ? -elem : elem;
+            }
+
+            auto max_elem = thrust::max_element(
+                make_transform_iterator(range.begin() + i, abs_func), 
+                make_transform_iterator(range.end(), abs_func)
+            );
+
             unsigned max_idx = max_elem - range.begin();
             double max_val = *max_elem;
 
