@@ -123,7 +123,7 @@ int main(){
             unsigned max_idx = max_elem - range.begin();
             double max_val = *max_elem;
 
-            cout << "Max elem: " << max_val << endl;
+            //cout << "Max elem: " << max_val << endl;
 
             if(max_idx != i){
                 swap_two_lines(d_C, i, max_idx, align);
