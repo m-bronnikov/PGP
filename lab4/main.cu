@@ -29,8 +29,6 @@ void throw_on_cuda_error(const cudaError_t& code, int itter){
 }
 
 struct abs_functor : public thrust::unary_function<double, double>{
-    abs_functor(){}
-
     __host__ __device__
     double operator()(double elem) const {
         return elem < 0.0 ? -elem : elem;
@@ -131,8 +129,8 @@ int main(){
 
 
             auto max_elem = thrust::max_element(
-                make_transform_iterator(range.begin() + i, abs_functor()), 
-                make_transform_iterator(range.end(), abs_functor())
+                make_transform_iterator(range.begin() + i, thrust::abs<double>()), 
+                make_transform_iterator(range.end(), thrust::abs<double>())
             );
 
             unsigned max_idx = max_elem - range.begin();
