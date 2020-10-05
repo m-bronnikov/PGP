@@ -28,9 +28,10 @@ void throw_on_cuda_error(const cudaError_t& code, int itter){
     }
 }
 
-struct abs_functor : public thrust::unary_function<double, double>{
+template <typename diff_type>
+struct abs_functor : public thrust::unary_function<diff_type, diff_type>{
     __host__ __device__
-    double operator()(double elem) const {
+    diff_type operator()(diff_type elem) const {
         return elem < 0.0 ? -elem : elem;
     }
 };
