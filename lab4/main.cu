@@ -129,8 +129,8 @@ int main(){
 
 
             auto max_elem = thrust::max_element(
-                make_transform_iterator(range.begin() + i, thrust::abs<double>()), 
-                make_transform_iterator(range.end(), thrust::abs<double>())
+                make_transform_iterator(range.begin() + i, abs_functor()), 
+                make_transform_iterator(range.end(), abs_functor())
             );
 
             unsigned max_idx = max_elem - range.begin();
