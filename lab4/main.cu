@@ -28,10 +28,9 @@ void throw_on_cuda_error(const cudaError_t& code, int itter){
     }
 }
 
-template <typename diff_type>
-struct abs_functor : public thrust::unary_function<diff_type, diff_type>{
+struct abs_functor : public thrust::unary_function<double, double>{
     __host__ __device__
-    diff_type operator()(diff_type elem) const {
+    double operator()(double elem) const {
         return elem < 0.0 ? -elem : elem;
     }
 };
@@ -125,13 +124,22 @@ int main(){
     // compute  LU
     try{
         for(unsigned i = 0; i < n - 1; ++i){
-            strided_range<thrust::device_vector<double>::iterator> 
-                range(d_C.begin() + i, d_C.end(), align); // create iterator
+            // create iterator:
+            strided_range<
+                thrust::transform_iterator<
+                    abs_functor, 
+                    thrust::device_vector<double>::iterator
+                >
+            > range(
+                make_transform_iterator(d_C.begin() + i, abs_functor()), 
+                make_transform_iterator(d_C.end(), abs_functor()), 
+                align
+            ); 
 
 
             auto max_elem = thrust::max_element(
-                make_transform_iterator(range.begin() + i, abs_functor()), 
-                make_transform_iterator(range.end(), abs_functor())
+                range.begin() + i, 
+                range.end()
             );
 
             unsigned max_idx = max_elem - range.begin();
