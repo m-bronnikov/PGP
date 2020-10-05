@@ -28,9 +28,9 @@ void throw_on_cuda_error(const cudaError_t& code, int itter){
     }
 }
 
-struct abs_functor{
+struct abs_functor : public thrust::unary_function<double, double>{
     abs_functor(){}
-    
+
     __host__ __device__
     double operator()(double elem) const {
         return elem < 0 ? -elem : elem;
