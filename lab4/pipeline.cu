@@ -5,12 +5,15 @@
 #include <vector>
 #include <stdlib.h>
 #include <iomanip>
+#include <fstream>
 
 using namespace std;
 using namespace thrust;
 
 const unsigned BLOCKS = 1024;
 const unsigned THREADS = 1024;
+
+#define __TIME_COUNT__
 
 struct abs_functor : public thrust::unary_function<double, double>{
     __host__ __device__
@@ -104,6 +107,14 @@ int main(){
     //d_p = h_ansvec
     throw_on_cuda_error(cudaMemcpy(d_C, h_C, sizeof(double) * n * n, cudaMemcpyHostToDevice));
 
+    #ifdef __TIME_COUNT__
+    cudaEvent_t start, stop;
+    float gpu_time = 0.0;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
+    #endif
+
     // compute  LU
     try{
         for(unsigned i = 0; i < n - 1; ++i){
@@ -136,10 +147,27 @@ int main(){
         cout << "ERROR: " << err.what() << endl;
     }
 
+    #ifdef __TIME_COUNT__
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&gpu_time, start, stop);
+
+    // open log:
+    ofstream log("logs.log", ios::app);
+    log << "Slow transpose" << endl;
+    // threads
+    log << BLOCKS << endl;
+    // size:
+    log << n << endl;
+    // time:
+    log << gpu_time << endl;
+    log.close();
+    #endif
+
     throw_on_cuda_error(cudaMemcpy(h_C, d_C, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
     throw_on_cuda_error(cudaFree(d_C));
 
-
+    #ifndef __TIME_COUNT__
     for(unsigned i = 0; i < n; ++i){
         for(unsigned j = 0; j < n; ++j){
             cout << std::scientific << std::setprecision(10) << h_C[j*n + i] << " ";
@@ -151,6 +179,8 @@ int main(){
         cout << h_p[i] << " ";
     }
     cout << endl;
+
+    #endif
 
     free(h_C);
     free(h_p);

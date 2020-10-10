@@ -8,7 +8,7 @@
 #include <thrust/iterator/transform_iterator.h>
 #include "strided_range.h"
 #include <iostream>
-#include <map>
+#include <fstream>
 #include <string>
 #include <iomanip>
 
@@ -17,6 +17,8 @@ using namespace thrust;
 
 const unsigned BLOCKS = 1024;
 const unsigned THREADS = 1024;
+
+#define __TIME_COUNT__
 
 
 void throw_on_cuda_error(const cudaError_t& code, int itter){
@@ -146,6 +148,14 @@ int main(){
     // pointer to mem:
     double* raw_C = thrust::raw_pointer_cast(d_C.data());
 
+    #ifdef __TIME_COUNT__
+    cudaEvent_t start, stop;
+    float gpu_time = 0.0;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
+    #endif
+
     // compute  LU
     try{
         for(unsigned i = 0; i < n - 1; ++i){
@@ -190,9 +200,27 @@ int main(){
         cout << "ERROR: " << err.what() << endl;
     }
 
+    #ifdef __TIME_COUNT__
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&gpu_time, start, stop);
+
+    // open log:
+    ofstream log("logs.log", ios::app);
+    log << "Fast classic" << endl;
+    // threads
+    log << BLOCKS << endl;
+    // size:
+    log << n << endl;
+    // time:
+    log << gpu_time << endl;
+    log.close();
+    #endif
+
     // memcpy from device to host
     h_C = d_C;
 
+    #ifndef __TIME_COUNT__
     // output for matrix:
     cout << std::scientific << std::setprecision(10);
     for(unsigned i = 0; i < n; ++i){
@@ -206,6 +234,7 @@ int main(){
         cout << h_ansvec[i] << " ";
     }
     cout << endl;
+    #endif
 
     return 0;
 }

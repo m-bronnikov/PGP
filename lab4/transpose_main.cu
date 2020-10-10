@@ -3,6 +3,7 @@
 #include <thrust/host_vector.h>
 #include <thrust/extrema.h>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <iomanip>
 
@@ -11,6 +12,8 @@ using namespace thrust;
 
 const unsigned BLOCKS = 1024;
 const unsigned THREADS = 1024;
+
+#define __TIME_COUNT__
 
 struct abs_functor : public thrust::unary_function<double, double>{
     __host__ __device__
@@ -140,6 +143,14 @@ int main(){
     //unsigned* raw_p = thrust::raw_pointer_cast(d_p.data());
 
     // compute  LU
+    #ifdef __TIME_COUNT__
+    cudaEvent_t start, stop;
+    float gpu_time = 0.0;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
+    #endif
+
     try{
         for(unsigned i = 0; i < n - 1; ++i){
             // search index of max elem in col
@@ -167,9 +178,29 @@ int main(){
         cout << "ERROR: " << err.what() << endl;
     }
 
+    #ifdef __TIME_COUNT__
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&gpu_time, start, stop);
+
+    // open log:
+    ofstream log("logs.log", ios::app);
+    log << "Fast transpose" << endl;
+    // threads
+    log << BLOCKS << endl;
+    // size:
+    log << n << endl;
+    // time:
+    log << gpu_time << endl;
+    log.close();
+    #endif
+
+    
+
     // memcpy device to host
     h_C = d_C;
 
+    #ifndef __TIME_COUNT__
     // output for matrix:
     cout << std::scientific << std::setprecision(10);
     for(unsigned i = 0; i < n; ++i){
@@ -183,6 +214,7 @@ int main(){
         cout << h_p[i] << " ";
     }
     cout << endl;
+    #endif
 
     return 0;
 }
