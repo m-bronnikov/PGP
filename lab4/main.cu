@@ -15,8 +15,8 @@
 using namespace std;
 using namespace thrust;
 
-const unsigned BLOCKS = 256;
-const unsigned THREADS = 256;
+const unsigned BLOCKS = 512;
+const unsigned THREADS = 512;
 
 
 void throw_on_cuda_error(const cudaError_t& code, int itter){
@@ -35,6 +35,14 @@ struct abs_functor : public thrust::unary_function<double, double>{
     }
 };
 
+struct abs_comparator{
+    abs_functor fabs;
+
+    __host__ __device__ double operator()(double a, double b){
+        return fabs(a) < fabs(b);
+    }
+};
+
 __global__ void gauss_step_L(double* C,  unsigned n, unsigned size, 
                                             unsigned col, double max_elem){
     unsigned thrd_idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -45,15 +53,14 @@ __global__ void gauss_step_L(double* C,  unsigned n, unsigned size,
     }
 }
 
-__global__ void gauss_step_U(double* C, unsigned n, unsigned size, 
-                                            unsigned col, double max_elem){
+__global__ void gauss_step_U(double* C, unsigned n, unsigned size, unsigned col){
     unsigned thrd_idx = threadIdx.x;
     unsigned blck_idx = blockIdx.x;
     unsigned thrd_step = blockDim.x;
     unsigned blck_step = gridDim.x;
 
     unsigned starting_point_blck = col + 1;
-    unsigned starting_point_thrd = (col + 1) >> 8; // start aligned by 256 
+    unsigned starting_point_thrd = (col + 1) - ((col + 1)&255); // start aligned by 256 
 
     
     for(unsigned i = blck_idx + starting_point_blck; i < n; i += blck_step){
@@ -84,22 +91,40 @@ unsigned get_aligned_size(unsigned n){
     return size;
 }
 
-void swap_two_lines(device_vector<double>& matrix, unsigned idx, unsigned jdx, unsigned size){
+/*
+void swap_two_lines(device_vector<double>& matrix, unsigned idx, unsigned jdx, unsigned n, unsigned size){
     thrust::swap_ranges(thrust::device, 
         matrix.begin() + idx * size, 
-        matrix.begin() + (idx + 1) * size, 
+        matrix.begin() + idx * size + n, 
         matrix.begin() + jdx * size
     );
+}
+*/
+
+__global__ void swap_lines(double* C, unsigned n, unsigned size, unsigned line1, unsigned line2){
+    unsigned thrd_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned thrd_step = blockDim.x * gridDim.x;
+
+    //unsigned start_point = (col + 1) >> 8;
+    for(unsigned index = thrd_idx; index < n; index += thrd_step){
+        double temp = C[line1*size + index];
+        C[line1*size + index] = C[line2*size + index];
+        C[line2*size + index] = temp;
+    }
 }
 
 
 int main(){
+    std::ios_base::sync_with_stdio(false);
+    std::cin.tie(nullptr);
+
     unsigned n;
     cin >> n;
+
     unsigned align = get_aligned_size(n);
     // alloc mem to union matrix(see wiki algorithm)
     host_vector<double> h_C(align * n);
-    device_vector<double> d_C(align * n);
+    device_vector<double> d_C;
     host_vector<unsigned> h_ansvec(n);
 
     //host_vector<unsigned> h_p(n);
@@ -125,41 +150,41 @@ int main(){
     try{
         for(unsigned i = 0; i < n - 1; ++i){
             // create iterator:
-            strided_range<
-                thrust::transform_iterator<
-                    abs_functor, 
-                    thrust::device_vector<double>::iterator
-                >
-            > range(
-                make_transform_iterator(d_C.begin() + i, abs_functor()), 
-                make_transform_iterator(d_C.end(), abs_functor()), 
+            
+            strided_range<thrust::device_vector<double>::iterator> range(
+                d_C.begin() + i, 
+                d_C.end(), 
                 align
             ); 
+            
+
+            auto it_beg = range.begin();
 
 
             auto max_elem = thrust::max_element(
-                range.begin() + i, 
-                range.end()
+                it_beg + i, it_beg + n, abs_comparator()
             );
 
-            unsigned max_idx = max_elem - range.begin();
+            unsigned max_idx = max_elem - it_beg;
             double max_val = *max_elem;
 
             //cout << "Max elem: " << max_val << endl;
 
             if(max_idx != i){
-                swap_two_lines(d_C, i, max_idx, align);
+                swap_lines<<<BLOCKS, THREADS>>>(raw_C, n, align, i, max_idx);
             }
 
             gauss_step_L<<<BLOCKS, THREADS>>>(raw_C, n, align, i, max_val);
 
+            throw_on_cuda_error(cudaGetLastError(), i);
+            throw_on_cuda_error(cudaThreadSynchronize(), i);
+
+            gauss_step_U<<<BLOCKS, THREADS>>>(raw_C, n, align, i);
+
             h_ansvec[i] = max_idx;
 
             throw_on_cuda_error(cudaGetLastError(), i);
-
-            gauss_step_U<<<BLOCKS, THREADS>>>(raw_C, n, align, i, max_val);
-
-            throw_on_cuda_error(cudaGetLastError(), i);
+            throw_on_cuda_error(cudaThreadSynchronize(), i);
         }
     }catch(runtime_error& err){
         cout << "ERROR: " << err.what() << endl;
@@ -172,19 +197,13 @@ int main(){
     cout << std::scientific << std::setprecision(10);
     for(unsigned i = 0; i < n; ++i){
         for(unsigned j = 0; j < n; ++j){
-            if(j){
-                cout << " ";
-            }
-            cout << h_C[i*align + j];
+            cout << h_C[i*align + j] << " ";
         }
         cout << endl;
     }
     // output of vector
     for(unsigned i = 0; i < n; ++i){
-        if(i){
-            cout << " ";
-        }
-        cout << h_ansvec[i];
+        cout << h_ansvec[i] << " ";
     }
     cout << endl;
 

@@ -1,5 +1,7 @@
 // code of class from https://github.com/NVIDIA/thrust/blob/master/examples/strided_range.cu
 
+#ifndef __STRIDED_RANGE__
+#define __STRIDED_RANGE__
 
 #include <thrust/functional.h>
 #include <thrust/iterator/transform_iterator.h>
@@ -54,3 +56,6 @@ class strided_range
     Iterator last;
     difference_type stride;
 };
+
+
+#endif
