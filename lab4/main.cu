@@ -15,8 +15,8 @@
 using namespace std;
 using namespace thrust;
 
-const unsigned BLOCKS = 512;
-const unsigned THREADS = 512;
+const unsigned BLOCKS = 1024;
+const unsigned THREADS = 1024;
 
 
 void throw_on_cuda_error(const cudaError_t& code, int itter){
