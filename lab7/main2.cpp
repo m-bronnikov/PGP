@@ -7,8 +7,6 @@
 #include <string.h>
 #include "mpi.h"
 
-#define RELEASE
-
 using namespace std;
 
 //#define ndims 3
@@ -27,7 +25,7 @@ double u_next(double ux0, double ux1, double uy0, double uy1,
                         double uz0, double uz1, double h2x, 
                         double h2y, double h2z){
     double ans = (ux0 + ux1) * h2x;
-    ans += (uy0 + uy1) * h2y; 
+    ans += (uy0 + uy1) * h2y;
     ans += (uz0 + uz1) * h2z;
     return ans;
 }
@@ -116,7 +114,6 @@ int main(int argc, char **argv){
 
     fill_n(pereod, ndims, 0); // we have non-pereodical topology
 
-
     // init topology and place of current worker in it
     MPI_Cart_create(MPI_COMM_WORLD, ndims, dimens, pereod, false, &grid_comm);
     MPI_Comm_rank(grid_comm, &proc_rank); // get rank in new topology
@@ -160,7 +157,7 @@ int main(int argc, char **argv){
     
     /* HEAP MEMORY ALLOC AND INIT */
     double* norm_data = new double[workers_count];
-    double* edge_buff_out[ndims_x_2]; 
+    double* edge_buff_out[ndims_x_2];
     double* edge_buff_in[ndims_x_2];
     double* buffer0;
     double* buffer1;
@@ -253,6 +250,7 @@ int main(int argc, char **argv){
                 );
             }
         }
+
 
         // Step 2(Walk inside):
         for(int k = 1; k < blocks[dir_z] - 1; ++k){
@@ -368,6 +366,7 @@ int main(int argc, char **argv){
                 }
             }
         }
+        // now we get all the  neigbours data and can compute corners
 
         // Step 4(corners commpute)
 
@@ -377,6 +376,7 @@ int main(int argc, char **argv){
             for(int o_j = front; o_j <= back; ++o_j){
                 int j = (o_j & 1) ? blocks[dir_y] - 1 : 0;
                 for(int i = 0; i < blocks[dir_x]; ++i){
+
                     double ux1 = i == 0 ? edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i - 1, j, k)];
                     double ux2 = (i == blocks[dir_x] - 1) ? edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i + 1, j, k)];
                     double uy1 = j == 0 ? edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j - 1, k)];
@@ -449,11 +449,11 @@ int main(int argc, char **argv){
             max_diff = max_diff < norm_data[i] ? norm_data[i] : max_diff; // maximum
         }
 
-
         // Step 6(swap buffers):
         double* tmp = buffer1;
         buffer1 = buffer0;
         buffer0 = tmp;
+
     }while(max_diff >= eps);
 
     // output of data:
@@ -507,8 +507,8 @@ int main(int argc, char **argv){
                                 ); // Bsend may be better
                             }
                         }
+                        MPI_Barrier(grid_comm); // syncronize
                     }
-                    MPI_Barrier(grid_comm); // syncronize
                 }
             }
         }
