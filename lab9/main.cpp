@@ -5,7 +5,11 @@
 #include <stdlib.h>
 #include <iomanip>
 #include <string.h>
+#include <omp.h>
 #include "mpi.h"
+
+
+#define RELEASE
 
 using namespace std;
 
@@ -15,8 +19,6 @@ using namespace std;
 const int ndims = 3;
 const int ndims_x_2 = 6;
 
-/*CODE UPDATING:*/
-
 int is_main(int worker){
     return worker ? 0 : 1;
 }
@@ -25,7 +27,7 @@ double u_next(double ux0, double ux1, double uy0, double uy1,
                         double uz0, double uz1, double h2x, 
                         double h2y, double h2z){
     double ans = (ux0 + ux1) * h2x;
-    ans += (uy0 + uy1) * h2y;
+    ans += (uy0 + uy1) * h2y; 
     ans += (uz0 + uz1) * h2z;
     return ans;
 }
@@ -114,6 +116,7 @@ int main(int argc, char **argv){
 
     fill_n(pereod, ndims, 0); // we have non-pereodical topology
 
+
     // init topology and place of current worker in it
     MPI_Cart_create(MPI_COMM_WORLD, ndims, dimens, pereod, false, &grid_comm);
     MPI_Comm_rank(grid_comm, &proc_rank); // get rank in new topology
@@ -156,8 +159,10 @@ int main(int argc, char **argv){
     dir_edge_sizes[dir_z] = blocks[dir_y] * blocks[dir_x];
     
     /* HEAP MEMORY ALLOC AND INIT */
+    int thrd_max = omp_get_max_threads();
     double* norm_data = new double[workers_count];
-    double* edge_buff_out[ndims_x_2];
+    double* max_values = new double[thrd_max];
+    double* edge_buff_out[ndims_x_2]; 
     double* edge_buff_in[ndims_x_2];
     double* buffer0;
     double* buffer1;
@@ -200,11 +205,15 @@ int main(int argc, char **argv){
         return i + j*ni;
     };
 
+    /* OMP CONFIGURATION */
+    omp_set_dynamic(0); // dont change my threads num in pragma parallel
+
     /* START OF ITTERATIVE COMPUTING: */
 
     double max_diff = 0.0; // maximum error
 
     do{
+        fill_n(max_values, thrd_max, 0.0);
         max_diff = 0.0;
         // Step 1(Send and recv call create):
         for(int dir = 0; dir < ndims; ++dir){
@@ -251,209 +260,289 @@ int main(int argc, char **argv){
             }
         }
 
-
         // Step 2(Walk inside):
-        for(int k = 1; k < blocks[dir_z] - 1; ++k){
-            for(int j = 1; j < blocks[dir_y] - 1; ++j){
-                for(int i = 1; i < blocks[dir_x] - 1; ++i){
-                    // new value:
+        // lets parallel this:
+        #pragma omp parallel
+        {
+            int num_threads = omp_get_num_threads();
+            int thread_idx = omp_get_thread_num();
+
+            #define next_ijk(i, j, k, step) { \
+                --i; --j; --k; \
+                i += step; \
+                int addition = i / (blocks[dir_x] - 2); \
+                i -= addition * (blocks[dir_x] - 2); \
+                j += addition; \
+                addition = j / (blocks[dir_y] - 2); \
+                j -= addition * (blocks[dir_y] - 2); \
+                k += addition; \
+                ++i; ++j; ++k; \
+            } \
+
+
+            int i = 1;
+            int j = 1;
+            int k = 1;
+            next_ijk(i, j, k, thread_idx);
+
+
+            if(blocks[dir_z] > 2 && blocks[dir_x] > 2 && blocks[dir_y] > 2){
+                while(k < blocks[dir_z] - 1){
+                    // compute next value
                     buffer1[idx(i, j, k)] = u_next(
                         buffer0[idx(i - 1, j, k)], buffer0[idx(i + 1, j, k)],
                         buffer0[idx(i, j - 1, k)], buffer0[idx(i, j + 1, k)],
                         buffer0[idx(i, j, k - 1)], buffer0[idx(i, j, k + 1)],
                         h2x, h2y, h2z
                     );
+
                     // compute max abs(diff):
-                    max_diff = max_determine(buffer0[idx(i, j, k)], buffer1[idx(i, j, k)], max_diff);
+                    max_values[thread_idx] = max_determine(buffer0[idx(i, j, k)], buffer1[idx(i, j, k)], max_values[thread_idx]);
+                    // compute next coords:
+
+                    next_ijk(i, j, k, num_threads);
                 }
             }
         }
 
         // Step 3(Wait of data from neighbours and compute edges):
-        // 3.1 left:
+        // 3.0 Wait all
+        for(int dir = 0; dir < ndims; ++dir){
+            int dir_x_2 = dir << 1;
+            if(coords[dir]){
+                recv_waiting(&in[dir_x_2], &out[dir_x_2]);
+            }
+            if(coords[dir] < dimens[dir] - 1){
+                recv_waiting(&in[dir_x_2 + 1], &out[dir_x_2 + 1]);
+            }
+        }
 
-        {
+        #pragma omp parallel
+        {   
+            // init steps and coords calculating
+            int num_threads = omp_get_num_threads();
+            int thread_idx = omp_get_thread_num();
+
+            #define next_jk(j, k, step) { \
+                --j; --k; \
+                j += step; \
+                int addition = j / (blocks[dir_y] - 2); \
+                j -= addition * (blocks[dir_y] - 2); \
+                k += addition; \
+                ++j; ++k; \
+            } \
+
+            #define next_ik(i, k, step) { \
+                --i; --k; \
+                i += step; \
+                int addition = i / (blocks[dir_x] - 2); \
+                i -= addition * (blocks[dir_x] - 2); \
+                k += addition; \
+                ++i; ++k; \
+            } \
+
+            #define next_ij(i, j, step) { \
+                --i; --j; \
+                i += step; \
+                int addition = i / (blocks[dir_x] - 2); \
+                i -= addition * (blocks[dir_x] - 2); \
+                j += addition; \
+                ++i; ++j; \
+            } \
+
+            // lets loop:
+
+            
             for(int orntr = left; orntr <= right; ++orntr){
-                if(!(orntr & 1) && coords[dir_x]){
-                    recv_waiting(&in[orntr], &out[orntr]);
-                }
-                if((orntr & 1) && coords[dir_x] < dimens[dir_x] - 1){
-                    recv_waiting(&in[orntr], &out[orntr]);
-                }
                 int ii = (orntr & 1) ? blocks[dir_x] - 1 : 0;
+                // init start
+                int k = 1, j = 1;
 
-                for(int k = 1; k < blocks[dir_z] - 1; ++k){
-                    for(int j = 1; j < blocks[dir_y] - 1; ++j){
-                        double u_1 = (ii == 0) ? 
-                                edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(ii - 1, j, k)];
-                        double u_2 = (ii == blocks[dir_x] - 1) ? 
-                                edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(ii + 1, j, k)];
+                if(blocks[dir_z] <= 2 || blocks[dir_y] <= 2){
+                    continue;
+                }
 
-                        buffer1[idx(ii, j, k)] = u_next(
-                            u_1, u_2,
-                            buffer0[idx(ii, j - 1, k)], buffer0[idx(ii, j + 1, k)],
-                            buffer0[idx(ii, j, k - 1)], buffer0[idx(ii, j, k + 1)],
-                            h2x, h2y, h2z
-                        );
+                next_jk(j, k, thread_idx);
+                
+                while(k < blocks[dir_z] - 1){
+                    double u_1 = (ii == 0) ? 
+                            edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(ii - 1, j, k)];
 
-                        // update value in out buffer
-                        edge_buff_out[orntr][edge_idx(j, k, blocks[dir_y])] = buffer1[idx(ii, j, k)];
-                        max_diff = max_determine(buffer1[idx(ii, j, k)], buffer0[idx(ii, j, k)], max_diff);
-                    }
+                    double u_2 = (ii == blocks[dir_x] - 1) ? 
+                            edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(ii + 1, j, k)];
+
+                    buffer1[idx(ii, j, k)] = u_next(
+                        u_1, u_2,
+                        buffer0[idx(ii, j - 1, k)], buffer0[idx(ii, j + 1, k)],
+                        buffer0[idx(ii, j, k - 1)], buffer0[idx(ii, j, k + 1)],
+                        h2x, h2y, h2z
+                    );
+
+                    // update value in out buffer
+                    edge_buff_out[orntr][edge_idx(j, k, blocks[dir_y])] = buffer1[idx(ii, j, k)];
+
+                    
+                    max_values[thread_idx] = max_determine(buffer1[idx(ii, j, k)], buffer0[idx(ii, j, k)], max_values[thread_idx]); 
+                    
+
+                    next_jk(j, k, num_threads);  
                 }
             }
-        }
 
 
-
-        {
             for(int orntr = front; orntr <= back; ++orntr){
-                if(!(orntr & 1) && coords[dir_y]){
-                    recv_waiting(&in[orntr], &out[orntr]);
-                }
-                if((orntr & 1) && coords[dir_y] < dimens[dir_y] - 1){
-                    recv_waiting(&in[orntr], &out[orntr]);
-                }
-
                 int jj = (orntr & 1) ? blocks[dir_y] - 1 : 0;
-                for(int k = 1; k < blocks[dir_z] - 1; ++k){
-                    for(int i = 1; i < blocks[dir_x] - 1; ++i){
-                        double u_1 = (jj == 0) ? 
-                                edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, jj - 1, k)];
-                        double u_2 = (jj == blocks[dir_y] - 1) ? 
-                                edge_buff_in[back][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, jj + 1, k)];
-                        buffer1[idx(i, jj, k)] = u_next(
-                            buffer0[idx(i - 1, jj, k)], buffer0[idx(i + 1, jj, k)],
-                            u_1, u_2,
-                            buffer0[idx(i, jj, k - 1)], buffer0[idx(i, jj, k + 1)],
-                            h2x, h2y, h2z
-                        );
+                int k = 1, i = 1;
 
-                        edge_buff_out[orntr][edge_idx(i, k, blocks[dir_x])] = buffer1[idx(i, jj, k)];
-                        max_diff = max_determine(buffer1[idx(i, jj, k)], buffer0[idx(i, jj, k)], max_diff);
-                    }
+                if(blocks[dir_z] <= 2 || blocks[dir_x] <= 2){
+                    continue;
+                }
+
+                next_ik(i, k, thread_idx);
+
+                while(k < blocks[dir_z] - 1){
+                    double u_1 = (jj == 0) ? 
+                            edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, jj - 1, k)];
+                    double u_2 = (jj == blocks[dir_y] - 1) ? 
+                            edge_buff_in[back][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, jj + 1, k)];
+                    buffer1[idx(i, jj, k)] = u_next(
+                        buffer0[idx(i - 1, jj, k)], buffer0[idx(i + 1, jj, k)],
+                        u_1, u_2,
+                        buffer0[idx(i, jj, k - 1)], buffer0[idx(i, jj, k + 1)],
+                        h2x, h2y, h2z
+                    );
+
+                    edge_buff_out[orntr][edge_idx(i, k, blocks[dir_x])] = buffer1[idx(i, jj, k)];
+
+                    max_values[thread_idx] = max_determine(buffer1[idx(i, jj, k)], buffer0[idx(i, jj, k)], max_values[thread_idx]);
+
+                    next_ik(i, k, num_threads); 
                 }
             }
-        }
 
 
-        {
             for(int orntr = down; orntr <= up; ++orntr){
-                if(!(orntr & 1) && coords[dir_z]){
-                    recv_waiting(&in[orntr], &out[orntr]);
-                }
-                if((orntr & 1) && coords[dir_z] < dimens[dir_z] - 1){
-                    recv_waiting(&in[orntr], &out[orntr]);
-                }
                 int kk = (orntr & 1) ? blocks[dir_z] - 1 : 0;
 
-                for(int j = 1; j < blocks[dir_y] - 1; ++j){
-                    for(int i = 1; i < blocks[dir_x] - 1; ++i){
-                        double u_1 = (kk == 0) ? 
-                                edge_buff_in[down][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, kk - 1)];
-                        double u_2 = (kk == blocks[dir_z] - 1) ? 
-                                edge_buff_in[up][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, kk + 1)];
-                        buffer1[idx(i, j, kk)] = u_next(
-                            buffer0[idx(i - 1, j, kk)], buffer0[idx(i + 1, j, kk)],
-                            buffer0[idx(i, j - 1, kk)], buffer0[idx(i, j + 1, kk)],
-                            u_1, u_2,
-                            h2x, h2y, h2z
-                        );
+                int j = 1, i = 1;
 
-                        edge_buff_out[orntr][edge_idx(i, j, blocks[dir_x])] = buffer1[idx(i, j, kk)];
-                        max_diff = max_determine(buffer1[idx(i, j, kk)], buffer0[idx(i, j, kk)], max_diff);
+                if(blocks[dir_x] <= 2 || blocks[dir_y] <= 2){
+                    continue;
+                }
+
+                next_ik(i, j, thread_idx);
+
+                while(j < blocks[dir_y] - 1){
+                    double u_1 = (kk == 0) ? 
+                            edge_buff_in[down][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, kk - 1)];
+                    double u_2 = (kk == blocks[dir_z] - 1) ? 
+                            edge_buff_in[up][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, kk + 1)];
+                    buffer1[idx(i, j, kk)] = u_next(
+                        buffer0[idx(i - 1, j, kk)], buffer0[idx(i + 1, j, kk)],
+                        buffer0[idx(i, j - 1, kk)], buffer0[idx(i, j + 1, kk)],
+                        u_1, u_2,
+                        h2x, h2y, h2z
+                    );
+
+                    edge_buff_out[orntr][edge_idx(i, j, blocks[dir_x])] = buffer1[idx(i, j, kk)];
+
+                    max_values[thread_idx] = max_determine(buffer1[idx(i, j, kk)], buffer0[idx(i, j, kk)], max_values[thread_idx]);
+              
+                    next_ik(i, j, num_threads); 
+                }
+            }
+
+            // Step 4(corners commpute)
+            // 4.1 X_dim:
+            for(int o_k = down; o_k <= up; ++o_k){
+                int k = (o_k & 1) ? blocks[dir_z] - 1 : 0;
+                for(int o_j = front; o_j <= back; ++o_j){
+                    int j = (o_j & 1) ? blocks[dir_y] - 1 : 0;
+                    for(int i = thread_idx; i < blocks[dir_x]; i += num_threads){
+                        double ux1 = i == 0 ? edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i - 1, j, k)];
+                        double ux2 = (i == blocks[dir_x] - 1) ? edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i + 1, j, k)];
+                        double uy1 = j == 0 ? edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j - 1, k)];
+                        double uy2 = (j == blocks[dir_y] - 1) ? edge_buff_in[back][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j + 1, k)];
+                        double uz1 = k == 0 ? edge_buff_in[down][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k - 1)];
+                        double uz2 = (k == blocks[dir_z] - 1) ? edge_buff_in[up][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k + 1)];
+
+                        buffer1[idx(i, j, k)] = u_next(ux1, ux2, uy1, uy2, uz1, uz2, h2x, h2y, h2z);
+
+                        edge_buff_out[o_j][edge_idx(i, k, blocks[dir_x])] = buffer1[idx(i, j, k)];
+                        edge_buff_out[o_k][edge_idx(i, j, blocks[dir_x])] = buffer1[idx(i, j, k)];
+
+                        max_values[thread_idx] = max_determine(buffer1[idx(i, j, k)], buffer0[idx(i, j, k)], max_values[thread_idx]);
                     }
                 }
             }
-        }
-        // now we get all the  neigbours data and can compute corners
+        
+            // 4.2 Y dim:
+            for(int o_k = down; o_k <= up; ++o_k){
+                int k = (o_k & 1) ? blocks[dir_z] - 1 : 0;
+                for(int o_i = left; o_i <= right; ++o_i){
+                    int i = (o_i & 1) ? blocks[dir_x] - 1 : 0;
+                    for(int j = thread_idx; j < blocks[dir_y]; j += num_threads){
+                        double ux1 = i == 0 ? edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i - 1, j, k)];
+                        double ux2 = (i == blocks[dir_x] - 1) ? edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i + 1, j, k)];
+                        double uy1 = j == 0 ? edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j - 1, k)];
+                        double uy2 = (j == blocks[dir_y] - 1) ? edge_buff_in[back][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j + 1, k)];
+                        double uz1 = k == 0 ? edge_buff_in[down][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k - 1)];
+                        double uz2 = (k == blocks[dir_z] - 1) ? edge_buff_in[up][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k + 1)];
 
-        // Step 4(corners commpute)
+                        buffer1[idx(i, j, k)] = u_next(ux1, ux2, uy1, uy2, uz1, uz2, h2x, h2y, h2z);
+                    
+                        edge_buff_out[o_k][edge_idx(i, j, blocks[dir_x])] = buffer1[idx(i, j, k)];
+                        edge_buff_out[o_i][edge_idx(j, k, blocks[dir_y])] = buffer1[idx(i, j, k)];
 
-        // 4.1 X_dim:
-        for(int o_k = down; o_k <= up; ++o_k){
-            int k = (o_k & 1) ? blocks[dir_z] - 1 : 0;
+                       
+                        max_values[thread_idx] = max_determine(buffer1[idx(i, j, k)], buffer0[idx(i, j, k)], max_values[thread_idx]);
+                    }
+                }
+            }
+
+            // 4.3 Z dim:
             for(int o_j = front; o_j <= back; ++o_j){
                 int j = (o_j & 1) ? blocks[dir_y] - 1 : 0;
-                for(int i = 0; i < blocks[dir_x]; ++i){
+                for(int o_i = left; o_i <= right; ++o_i){
+                    int i = (o_i & 1) ? blocks[dir_x] - 1 : 0;
+                    for(int k = thread_idx; k < blocks[dir_z]; k+=num_threads){
+                        double ux1 = i == 0 ? edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i - 1, j, k)];
+                        double ux2 = (i == blocks[dir_x] - 1) ? edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i + 1, j, k)];
+                        double uy1 = j == 0 ? edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j - 1, k)];
+                        double uy2 = (j == blocks[dir_y] - 1) ? edge_buff_in[back][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j + 1, k)];
+                        double uz1 = k == 0 ? edge_buff_in[down][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k - 1)];
+                        double uz2 = (k == blocks[dir_z] - 1) ? edge_buff_in[up][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k + 1)];
 
-                    double ux1 = i == 0 ? edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i - 1, j, k)];
-                    double ux2 = (i == blocks[dir_x] - 1) ? edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i + 1, j, k)];
-                    double uy1 = j == 0 ? edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j - 1, k)];
-                    double uy2 = (j == blocks[dir_y] - 1) ? edge_buff_in[back][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j + 1, k)];
-                    double uz1 = k == 0 ? edge_buff_in[down][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k - 1)];
-                    double uz2 = (k == blocks[dir_z] - 1) ? edge_buff_in[up][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k + 1)];
+                        buffer1[idx(i, j, k)] = u_next(ux1, ux2, uy1, uy2, uz1, uz2, h2x, h2y, h2z);
 
-                    buffer1[idx(i, j, k)] = u_next(ux1, ux2, uy1, uy2, uz1, uz2, h2x, h2y, h2z);
-
-                    edge_buff_out[o_j][edge_idx(i, k, blocks[dir_x])] = buffer1[idx(i, j, k)];
-                    edge_buff_out[o_k][edge_idx(i, j, blocks[dir_x])] = buffer1[idx(i, j, k)];
-
-                    max_diff = max_determine(buffer1[idx(i, j, k)], buffer0[idx(i, j, k)], max_diff);
-                }
-            }
-        }
-        
-        // 4.2 Y dim:
-        for(int o_k = down; o_k <= up; ++o_k){
-            int k = (o_k & 1) ? blocks[dir_z] - 1 : 0;
-            for(int o_i = left; o_i <= right; ++o_i){
-                int i = (o_i & 1) ? blocks[dir_x] - 1 : 0;
-                for(int j = 0; j < blocks[dir_y]; ++j){
-
-                    double ux1 = i == 0 ? edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i - 1, j, k)];
-                    double ux2 = (i == blocks[dir_x] - 1) ? edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i + 1, j, k)];
-                    double uy1 = j == 0 ? edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j - 1, k)];
-                    double uy2 = (j == blocks[dir_y] - 1) ? edge_buff_in[back][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j + 1, k)];
-                    double uz1 = k == 0 ? edge_buff_in[down][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k - 1)];
-                    double uz2 = (k == blocks[dir_z] - 1) ? edge_buff_in[up][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k + 1)];
-
-                    buffer1[idx(i, j, k)] = u_next(ux1, ux2, uy1, uy2, uz1, uz2, h2x, h2y, h2z);
+                        edge_buff_out[o_j][edge_idx(i, k, blocks[dir_x])] = buffer1[idx(i, j, k)];
+                        edge_buff_out[o_i][edge_idx(j, k, blocks[dir_y])] = buffer1[idx(i, j, k)];
                     
-                    edge_buff_out[o_k][edge_idx(i, j, blocks[dir_x])] = buffer1[idx(i, j, k)];
-                    edge_buff_out[o_i][edge_idx(j, k, blocks[dir_y])] = buffer1[idx(i, j, k)];
-
-                    max_diff = max_determine(buffer1[idx(i, j, k)], buffer0[idx(i, j, k)], max_diff);
-                }
-            }
-        }
-
-        // 4.3 Z dim:
-        for(int o_j = front; o_j <= back; ++o_j){
-            int j = (o_j & 1) ? blocks[dir_y] - 1 : 0;
-            for(int o_i = left; o_i <= right; ++o_i){
-                int i = (o_i & 1) ? blocks[dir_x] - 1 : 0;
-                for(int k = 0; k < blocks[dir_z]; ++k){
-
-                    double ux1 = i == 0 ? edge_buff_in[left][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i - 1, j, k)];
-                    double ux2 = (i == blocks[dir_x] - 1) ? edge_buff_in[right][edge_idx(j, k, blocks[dir_y])] : buffer0[idx(i + 1, j, k)];
-                    double uy1 = j == 0 ? edge_buff_in[front][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j - 1, k)];
-                    double uy2 = (j == blocks[dir_y] - 1) ? edge_buff_in[back][edge_idx(i, k, blocks[dir_x])] : buffer0[idx(i, j + 1, k)];
-                    double uz1 = k == 0 ? edge_buff_in[down][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k - 1)];
-                    double uz2 = (k == blocks[dir_z] - 1) ? edge_buff_in[up][edge_idx(i, j, blocks[dir_x])] : buffer0[idx(i, j, k + 1)];
-
-                    buffer1[idx(i, j, k)] = u_next(ux1, ux2, uy1, uy2, uz1, uz2, h2x, h2y, h2z);
-
-                    edge_buff_out[o_j][edge_idx(i, k, blocks[dir_x])] = buffer1[idx(i, j, k)];
-                    edge_buff_out[o_i][edge_idx(j, k, blocks[dir_y])] = buffer1[idx(i, j, k)];
                     
-                    max_diff = max_determine(buffer1[idx(i, j, k)], buffer0[idx(i, j, k)], max_diff);
+                        max_values[thread_idx] = max_determine(buffer1[idx(i, j, k)], buffer0[idx(i, j, k)], max_values[thread_idx]);
+                    }
                 }
             }
+
         }
 
         // Step 5(Control of stopping):
+        for(int thrd = 0; thrd < thrd_max; ++thrd){
+            max_diff = max_diff < max_values[thrd] ? max_values[thrd] : max_diff;
+        }
+
         MPI_Allgather(&max_diff, 1, MPI_DOUBLE, norm_data, 1, MPI_DOUBLE, grid_comm);
-        max_diff = 0.0;
+
+        // may be parallel
         for(int i = 0; i < workers_count; ++i){
             max_diff = max_diff < norm_data[i] ? norm_data[i] : max_diff; // maximum
         }
+
 
         // Step 6(swap buffers):
         double* tmp = buffer1;
         buffer1 = buffer0;
         buffer0 = tmp;
-
     }while(max_diff >= eps);
 
     // output of data:
@@ -507,7 +596,6 @@ int main(int argc, char **argv){
                                 ); // Bsend may be better
                             }
                         }
-                        MPI_Barrier(grid_comm); // syncronize
                     }
                 }
             }
@@ -519,6 +607,7 @@ int main(int argc, char **argv){
 
     // free all memory
     delete[] norm_data;
+    delete[] max_values;
     delete[] buffer0;
     delete[] buffer1;
     for(int dir = 0; dir < ndims; ++dir){

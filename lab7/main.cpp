@@ -7,7 +7,7 @@
 #include <string.h>
 #include "mpi.h"
 
-#define RELEASE
+#define TIME_COUNT
 
 using namespace std;
 
@@ -97,6 +97,13 @@ int main(int argc, char **argv){
         cin >> u[front] >> u[back];
         cin >> u0;
     }
+
+    #ifdef TIME_COUNT
+    double time_start;
+    if(main_worker){
+        time_start = MPI_Wtime();
+    }
+    #endif
 
     // send/recv all data
     MPI_Bcast(dimens, ndims, MPI_INT, 0, MPI_COMM_WORLD);
@@ -533,6 +540,15 @@ int main(int argc, char **argv){
     if(main_worker){
         fout.close();
     }
+
+    #ifdef TIME_COUNT
+    double time_end;
+    if(main_worker){
+        time_end = MPI_Wtime();
+        cout << "Inference time: ";
+        cout << 1000.0 * (time_end - time_start) << "ms" << endl;
+    }
+    #endif
 
     return 0;
 }
