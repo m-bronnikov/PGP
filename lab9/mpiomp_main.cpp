@@ -9,7 +9,7 @@
 #include "mpi.h"
 
 
-#define RELEASE
+#define TIME_COUNT
 
 using namespace std;
 
@@ -53,9 +53,6 @@ void print_line(ostream& os, double* line, int size){
 
 
 int main(int argc, char **argv){
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-
     /*       DETERMINE ALGORITHM VARIABLES:      */
     int main_worker, proc_rank;
     int workers_count = 0;
@@ -98,6 +95,13 @@ int main(int argc, char **argv){
         cin >> u0;
     }
 
+    #ifdef TIME_COUNT
+    double time_start;
+    if(main_worker){
+        time_start = MPI_Wtime();
+    }
+    #endif
+    
     // send/recv all data
     MPI_Bcast(dimens, ndims, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(blocks, ndims, MPI_INT, 0, MPI_COMM_WORLD);
@@ -213,6 +217,7 @@ int main(int argc, char **argv){
     double max_diff = 0.0; // maximum error
 
     do{
+        #endif
         fill_n(max_values, thrd_max, 0.0);
         max_diff = 0.0;
         // Step 1(Send and recv call create):
@@ -268,15 +273,15 @@ int main(int argc, char **argv){
             int thread_idx = omp_get_thread_num();
 
             #define next_ijk(i, j, k, step) { \
-                --i; --j; --k; \
                 i += step; \
-                int addition = i / (blocks[dir_x] - 2); \
-                i -= addition * (blocks[dir_x] - 2); \
-                j += addition; \
-                addition = j / (blocks[dir_y] - 2); \
-                j -= addition * (blocks[dir_y] - 2); \
-                k += addition; \
-                ++i; ++j; ++k; \
+                while(i > blocks[dir_x] - 2){ \
+                    i -= blocks[dir_x] - 2; \
+                    ++j; \
+                } \
+                while(j > blocks[dir_y] - 2){ \
+                    j -= blocks[dir_y] - 2; \
+                    ++k; \
+                } \
             } \
 
 
@@ -324,30 +329,27 @@ int main(int argc, char **argv){
             int thread_idx = omp_get_thread_num();
 
             #define next_jk(j, k, step) { \
-                --j; --k; \
                 j += step; \
-                int addition = j / (blocks[dir_y] - 2); \
-                j -= addition * (blocks[dir_y] - 2); \
-                k += addition; \
-                ++j; ++k; \
+                while(j > blocks[dir_y] - 2){ \
+                    j -= blocks[dir_y] - 2; \
+                    ++k; \
+                } \
             } \
 
             #define next_ik(i, k, step) { \
-                --i; --k; \
                 i += step; \
-                int addition = i / (blocks[dir_x] - 2); \
-                i -= addition * (blocks[dir_x] - 2); \
-                k += addition; \
-                ++i; ++k; \
+                while(i > blocks[dir_x] - 2){ \
+                    i -= blocks[dir_x] - 2; \
+                    ++k; \
+                } \
             } \
 
             #define next_ij(i, j, step) { \
-                --i; --j; \
                 i += step; \
-                int addition = i / (blocks[dir_x] - 2); \
-                i -= addition * (blocks[dir_x] - 2); \
-                j += addition; \
-                ++i; ++j; \
+                while(i > blocks[dir_x] - 2){ \
+                    i -= blocks[dir_x] - 2; \
+                    ++j; \
+                } \
             } \
 
             // lets loop:
@@ -622,6 +624,16 @@ int main(int argc, char **argv){
     if(main_worker){
         fout.close();
     }
+
+    #ifdef TIME_COUNT
+    double time_end;
+    if(main_worker){
+        time_end = MPI_Wtime();
+        cout << "Inference time: ";
+        cout << 1000.0 * (time_end - time_start) << "ms" << endl;
+    }
+    #endif
+
 
     return 0;
 }
