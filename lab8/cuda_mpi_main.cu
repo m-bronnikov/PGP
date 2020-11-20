@@ -26,7 +26,7 @@ const int BLOCKS = 32;
 const int THREADS = 32;
 
 const int precission = 6;
-const int float_size = 13; // 12 digits in one + separator
+const int float_size = 14; // 12 digits in one + separator + possible minus
 
 /* CUDA FUNCTIONS */
 
@@ -600,13 +600,22 @@ int main(int argc, char **argv){
     //////////////////////////////////////////////////////////////////////////////////////////
     // convert data to txt
     char* write_data = new char[buff_size * float_size]; // data for human readable i-o
+    //memset(write_data, (int)' ', buff_size * float_size * sizeof(char));
     for(int k = 1; k <= blocks[dir_z]; ++k){
         for(int j = 1; j <= blocks[dir_y]; ++j){
-            int i;
+            int i, len;
             for(i = 1; i < blocks[dir_x]; ++i){
-                sprintf(&write_data[idx(i, j, k)*float_size], "%.*e ", precission, h_buffer0[idx(i, j, k)]);
+                len = sprintf(&write_data[idx(i, j, k)*float_size], "%.*e ", precission, h_buffer0[idx(i, j, k)]);
+                // if we writed without minnus => we should change '\0' to separator
+                if(len < float_size){
+                    write_data[idx(i, j, k)*float_size + len] = ' ';
+                }
             }
-            sprintf(&write_data[idx(i, j, k)*float_size], "%.*e\n", precission, h_buffer0[idx(i, j, k)]);
+            // [OPTIONAL]: add '\n' to end instead ' '
+            len = sprintf(&write_data[idx(i, j, k)*float_size], "%.*e\n", precission, h_buffer0[idx(i, j, k)]);
+            if(len < float_size){
+                write_data[idx(i, j, k)*float_size + len] = '\n';
+            }
         }
     }
 
