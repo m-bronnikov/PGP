@@ -1,4 +1,4 @@
-# Programing of Graphical processors
+# Programing of Graphical Processors
 
 ## Laboratory works
 
