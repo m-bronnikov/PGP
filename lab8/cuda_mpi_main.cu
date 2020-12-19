@@ -19,8 +19,8 @@ using namespace std;
 const int ndims = 3;
 const int ndims_x_2 = 6;
 
-const int LITTLE_BLOCKS = 16;
-const int LITTLE_THREADS = 16;
+const int LITTLE_BLOCKS = 32;
+const int LITTLE_THREADS = 32;
 
 const int BLOCKS = 32;
 const int THREADS = 32;
