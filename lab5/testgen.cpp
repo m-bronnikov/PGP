@@ -9,7 +9,7 @@
 using namespace std;
 
 #define INT_LIMIT 16777216 // 2^24
-
+//#define INT_LIMIT 64
 const string separate_line = "===============================";
 const string done = " - DONE";
 const string fail = " - FAIL";

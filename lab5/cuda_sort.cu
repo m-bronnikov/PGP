@@ -3,15 +3,22 @@
 #include <vector>
 
 #define INT_LIMIT 16777216 // 2^24
-#define MAX_BLOCKS 1024
-#define THREADS 512
+// #define INT_LIMIT 64 // 2^24
+// #define THREADS 16
+// #define THREADS_X2 32
+#define MAX_BLOCKS 1024u
+#define THREADS 512u
+#define THREADS_X2 1024u
 
-#define NUM_BANKS 16
-#define LOG_NUM_BANKS 4
+#define NUM_BANKS 16u
+#define LOG_NUM_BANKS 4u
 
 // This offset definition helps to avoid bank conflicts in scan
 // ref: https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
 #define AVOID_OFFSET(n) ((n) >> NUM_BANKS + (n) >> (LOG_NUM_BANKS << 1))
+
+
+#define RELEASE // DEBUG
 
 using namespace std;
 
@@ -25,6 +32,24 @@ void throw_on_cuda_error(const cudaError_t& code)
     throw std::runtime_error(err_str);
   }
 }
+
+#ifdef DEBUG
+
+// ONLY FOR DEBUG:
+void debug_print_global_device_mem(uint32_t* d_data, uint32_t size){
+    uint32_t* h_data = new uint32_t[size];
+    cudaMemcpy(h_data, d_data, sizeof(int32_t)*size, cudaMemcpyDeviceToHost);
+
+    for(uint32_t i = 0; i < size; ++i){
+        cerr << h_data[i] << " ";
+    }
+
+    cerr << endl;
+
+    delete[] h_data;
+}
+
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////
@@ -80,8 +105,8 @@ void block_scan(const uint32_t tid, uint32_t* data, uint32_t* shared_temp, const
     if(!tid){
         shared_temp[size - 1 + AVOID_OFFSET(size - 1)] = 0; // set last elem zeros(first step of descent)
     }
-    offset >>= 1;
 
+    offset >>= 1;
     // down-sweep pass
     for(uint32_t d = 1; d < size; d <<= 1, offset >>= 1){
         __syncthreads(); // before next change of shared mem we need to sync last access
@@ -99,28 +124,27 @@ void block_scan(const uint32_t tid, uint32_t* data, uint32_t* shared_temp, const
         }
     }
 
+    // Block E: 
     // Write results back into global mem
-    __syncthreads();
-
-    // Block E:
     // We use '+=' instead '=' because we want get inclusive scan(standart algo gives exclusive)
+    __syncthreads();
     data[ai] += shared_temp[ai + bank_offset_a];
     data[bi] += shared_temp[bi + bank_offset_b];
 }
 
 // This method runs block scans with step determined by count of runned blocks
-// We think, that size % THREADS = 0 (it requirement to allocation procedure from host) 
+// We think, that size % THREADS_X2 = 0 (it requirement to allocation procedure from host) 
 __global__
 void scan_step(uint32_t* data_in, const uint32_t size){
-    __shared__ uint32_t temp[(THREADS * sizeof(uint32_t)) << 1];
+    __shared__ uint32_t temp[THREADS_X2 * sizeof(uint32_t)];
 
     const uint32_t thread_id = threadIdx.x;
-    const uint32_t start = blockIdx.x * blockDim.x;
-    const uint32_t step = blockDim.x * gridDim.x;
+    const uint32_t start = blockIdx.x * THREADS_X2;
+    const uint32_t step = THREADS_X2 * gridDim.x;
 
     for(uint32_t offset = start; offset < size; offset += step){
         // launch scan algo for block
-        block_scan(thread_id, &data_in[offset], temp, THREADS);
+        block_scan(thread_id, &data_in[offset], temp, THREADS_X2);
     }
 }
 
@@ -130,10 +154,11 @@ void add_block_sums(uint32_t* data, const uint32_t* sums, const uint32_t sums_co
     uint32_t start = blockIdx.x + 1;
     uint32_t step = gridDim.x;
     uint32_t tid = threadIdx.x;
-    uint32_t block_size = blockDim.x;
     
     for(uint32_t i = start; i < sums_count; i += step){
-        data[i*block_size + tid] = sums[i - 1]; // no memory conflicts here
+        uint32_t add = sums[i - 1];
+        data[i*THREADS_X2 + tid + tid] += add; // no memory conflicts here
+        data[i*THREADS_X2 + tid + tid + 1] += add; // no memory conflicts here
     }
 }
 
@@ -176,13 +201,12 @@ uint32_t compute_offset(uint32_t size, const uint32_t base){
 
 // Recursive function of scan for arbitrary lenght
 void scan(uint32_t* d_data, const uint32_t size){
-    uint32_t blocks = size / THREADS;
+    uint32_t blocks = size / THREADS_X2; // each block computes 2*THREADS values
     uint32_t launch_blocks = blocks > MAX_BLOCKS ? MAX_BLOCKS : blocks;
 
     scan_step<<<launch_blocks, THREADS>>>(d_data, size); // launch scan per block kernel
     throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
-
-    // No need synchronize because cudaMalloc bellow will do it instead us :)
+    cudaThreadSynchronize(); // wait end
 
     // condition for stop of recursia
     if(blocks == 1){
@@ -191,58 +215,100 @@ void scan(uint32_t* d_data, const uint32_t size){
 
     // alloc new data wit overheap for correct scan on next recursive step
     uint32_t* addition_sums = nullptr;
-    uint32_t alloc_size = compute_offset(blocks, THREADS);
+    uint32_t alloc_size = compute_offset(blocks, THREADS_X2); // overheap
     throw_on_cuda_error(cudaMalloc((void**)&addition_sums, alloc_size*sizeof(uint32_t))); 
 
     // Copy mem with stride:
     throw_on_cuda_error(cudaMemcpy2D(
         addition_sums, 
         sizeof(uint32_t), 
-        d_data + (THREADS - 1), // get last elem of each block
-        THREADS * sizeof(uint32_t), // stride between values
+        d_data + (THREADS_X2 - 1), // get last elem of each block
+        THREADS_X2 * sizeof(uint32_t), // stride between values
         sizeof(uint32_t), blocks, // copy #blocks elements
         cudaMemcpyDeviceToDevice
     ));
 
-    // launch recursia:
+    // launch recursia for sums:
     scan(addition_sums, alloc_size);
+
+    #ifdef DEBUG
+    cerr << "Sums:" << endl;
+    debug_print_global_device_mem(addition_sums, blocks);
+    cerr << "-" << endl;
+    debug_print_global_device_mem(d_data, THREADS_X2);
+    cerr << "-" << endl;
+    debug_print_global_device_mem(d_data + THREADS_X2, THREADS_X2);
+    #endif
+
 
     // add sums to native data:
     add_block_sums<<<launch_blocks, THREADS>>>(d_data, addition_sums, blocks);
     throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
 
+    // No need sync because cudaFree will do it
+
     // free useless data:
-    cudaFree(addition_sums);
+    throw_on_cuda_error(cudaFree(addition_sums));
 }
 
-void inplace_count_sort(int32_t* h_data, const uint32_t size){
+void cuda_count_sort(int32_t* h_data, const uint32_t size){
     // device data:
     uint32_t* d_counts;
     int32_t* d_data;
 
     // alloc data with overheap for scan algo
     throw_on_cuda_error(cudaMalloc((void**)&d_data, size*sizeof(int32_t)));
-    throw_on_cuda_error(cudaMalloc((void**)&d_counts, compute_offset(INT_LIMIT, THREADS)*sizeof(uint32_t)));
+    throw_on_cuda_error(cudaMalloc(
+        (void**)&d_counts, 
+        compute_offset(INT_LIMIT, THREADS_X2)*sizeof(uint32_t))
+    );
     
     // copy data into buffers
     throw_on_cuda_error(cudaMemcpy(d_data, h_data, sizeof(int32_t)*size, cudaMemcpyHostToDevice));
     throw_on_cuda_error(cudaMemset(d_counts, 0, INT_LIMIT*sizeof(uint32_t))); // init histogram with zero
+
+    #ifdef DEBUG
+    cerr << "Print #1:" << endl;
+    debug_print_global_device_mem((uint32_t*)d_data, size);
+    #endif
 
     // step 1: compute histogram
     compute_histogram<<<MAX_BLOCKS, THREADS>>>(d_counts, d_data, size);
     throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
     cudaThreadSynchronize(); // wait end
 
+    #ifdef DEBUG
+    cerr << endl;
+    cerr << "Print #2:" << endl;
+    debug_print_global_device_mem(d_counts, INT_LIMIT);
+    #endif
+
     // step 2: prefix sums of histogram
     scan(d_counts, INT_LIMIT);
-    cudaThreadSynchronize(); // wait end
+
+    #ifdef DEBUG
+    cerr << endl;
+    cerr << "Print #3:" << endl;
+    debug_print_global_device_mem(d_counts, INT_LIMIT);
+    #endif
+
 
     // step 3: change input to true order
     sort_by_counts<<<MAX_BLOCKS, THREADS>>>(d_data, d_counts, INT_LIMIT);
     throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
 
+    #ifdef DEBUG
+    cerr << endl;
+    cerr << "Print #4:" << endl;
+    debug_print_global_device_mem((uint32_t*)d_data, size);
+
+    cerr << "End!" << endl;
+    #endif
+
     // copy data back:
     throw_on_cuda_error(cudaMemcpy(h_data, d_data, sizeof(int32_t)*size, cudaMemcpyDeviceToHost));
+
+    
 
     // Free data:
     throw_on_cuda_error(cudaFree(d_data));
@@ -255,6 +321,7 @@ void inplace_count_sort(int32_t* h_data, const uint32_t size){
 ==========================================================================================
 */
 
+// function for read data from stream
 int32_t* read_data(uint32_t& data_size, istream& is){
     // host data:
     int32_t* data = nullptr;
@@ -278,6 +345,7 @@ int main(){
     // host data:
     uint32_t data_size = 0;
     int32_t* data = nullptr;
+
     // read data from cin
     try{
         data = read_data(data_size, cin);
@@ -286,12 +354,15 @@ int main(){
         return 0;
     }
 
-    // sort data
+
     try
     {
-        inplace_count_sort(data, data_size);
+        // Launch cuda sort
+        cuda_count_sort(data, data_size);
     }catch(const std::runtime_error& err){
         cerr << err.what() << endl;
+        delete[] data;
+        return 0;
     }
     
     // write data and clear buffer
