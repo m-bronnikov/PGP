@@ -3,15 +3,60 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <string.h>
 #include <algorithm>
 
 using namespace std;
 
 #define INT_LIMIT 16777216 // 2^24
+#define STD_CHECK false
 
 const string separate_line = "===============================";
 const string done = " - DONE";
 const string fail = " - FAIL";
+
+
+// count sort for faster check of large data
+void cpu_count_sort(int32_t* data, uint32_t size){
+    if(!size){
+        return;
+    }
+
+    uint32_t* counter = new uint32_t[INT_LIMIT];
+    memset(counter, 0, INT_LIMIT*sizeof(uint32_t));
+
+    // histogram
+    for(uint32_t j = 0; j < size; j++){
+        ++counter[data[j]];
+    }
+
+    // exclusive scan
+    uint32_t sum = 0;
+    for(uint32_t j = 0; j < INT_LIMIT; ++j){
+        uint32_t temp = counter[j];
+        counter[j] = sum;
+        sum += temp;
+    }
+
+    // Sorting:
+
+    // without last element
+    for(uint32_t j = 0; j < INT_LIMIT - 1; ++j){
+        while(counter[j] < counter[j + 1]){
+            data[counter[j]++] = j;
+        }
+    }
+
+    // last element
+    {
+        while(counter[INT_LIMIT - 1] < size){
+            data[counter[INT_LIMIT - 1]++] = INT_LIMIT - 1;
+        }  
+    }
+
+    delete[] counter;
+}
+
 
 int main(int argc, char const *argv[])
 {
@@ -68,8 +113,12 @@ int main(int argc, char const *argv[])
     cout << "START COMPARE DATA" << endl;
     cout << separate_line << endl;
 
-    // sort source sequence
-    sort(begin(source_seq), end(source_seq));
+
+    if(STD_CHECK){
+        sort(begin(source_seq), end(source_seq)); // this implementation 100% correct but O(n logn)
+    }else{
+        cpu_count_sort(reinterpret_cast<int32_t*>(source_seq.data()), size); // this implementation faster O(n)
+    }
 
     // compare seqs
     string status = "SUCCESS";

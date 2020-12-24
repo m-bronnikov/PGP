@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <stdexcept>
+#include <chrono>
 
 #define INT_LIMIT 16777216 // 2^24
 // #define INT_LIMIT 64 // 2^24
@@ -19,9 +20,11 @@
 #define AVOID_OFFSET(n) ((n) >> NUM_BANKS + (n) >> (LOG_NUM_BANKS << 1))
 
 
-#define RELEASE // DEBUG
+#define TIME_COUNT // set for count time 
+#define SORT_GPU // set device for computing
 
 using namespace std;
+using namespace std::chrono;
 
 // Error handler
 void throw_on_cuda_error(const cudaError_t& code)
@@ -33,24 +36,6 @@ void throw_on_cuda_error(const cudaError_t& code)
     throw std::runtime_error(err_str);
   }
 }
-
-#ifdef DEBUG
-
-// ONLY FOR DEBUG:
-void debug_print_global_device_mem(uint32_t* d_data, uint32_t size){
-    uint32_t* h_data = new uint32_t[size];
-    cudaMemcpy(h_data, d_data, sizeof(int32_t)*size, cudaMemcpyDeviceToHost);
-
-    for(uint32_t i = 0; i < size; ++i){
-        cerr << h_data[i] << " ";
-    }
-
-    cerr << endl;
-
-    delete[] h_data;
-}
-
-#endif
 
 
 ///////////////////////////////////////////////////////////////////////
@@ -232,16 +217,6 @@ void scan(uint32_t* d_data, const uint32_t size){
     // launch recursia for sums:
     scan(addition_sums, alloc_size);
 
-    #ifdef DEBUG
-    cerr << "Sums:" << endl;
-    debug_print_global_device_mem(addition_sums, blocks);
-    cerr << "-" << endl;
-    debug_print_global_device_mem(d_data, THREADS_X2);
-    cerr << "-" << endl;
-    debug_print_global_device_mem(d_data + THREADS_X2, THREADS_X2);
-    #endif
-
-
     // add sums to native data:
     add_block_sums<<<launch_blocks, THREADS>>>(d_data, addition_sums, blocks);
     throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
@@ -252,6 +227,7 @@ void scan(uint32_t* d_data, const uint32_t size){
     throw_on_cuda_error(cudaFree(addition_sums));
 }
 
+// count sort on gpu inplace
 void cuda_count_sort(int32_t* h_data, const uint32_t size){
     // device data:
     uint32_t* d_counts;
@@ -268,43 +244,17 @@ void cuda_count_sort(int32_t* h_data, const uint32_t size){
     throw_on_cuda_error(cudaMemcpy(d_data, h_data, sizeof(int32_t)*size, cudaMemcpyHostToDevice));
     throw_on_cuda_error(cudaMemset(d_counts, 0, INT_LIMIT*sizeof(uint32_t))); // init histogram with zero
 
-    #ifdef DEBUG
-    cerr << "Print #1:" << endl;
-    debug_print_global_device_mem((uint32_t*)d_data, size);
-    #endif
-
     // step 1: compute histogram
     compute_histogram<<<MAX_BLOCKS, THREADS>>>(d_counts, d_data, size);
     throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
     cudaThreadSynchronize(); // wait end
 
-    #ifdef DEBUG
-    cerr << endl;
-    cerr << "Print #2:" << endl;
-    debug_print_global_device_mem(d_counts, INT_LIMIT);
-    #endif
-
-    // step 2: prefix sums of histogram
+    // step 2: prefix sums(inclusive scan) of histogram
     scan(d_counts, INT_LIMIT);
-
-    #ifdef DEBUG
-    cerr << endl;
-    cerr << "Print #3:" << endl;
-    debug_print_global_device_mem(d_counts, INT_LIMIT);
-    #endif
-
 
     // step 3: change input to true order
     sort_by_counts<<<MAX_BLOCKS, THREADS>>>(d_data, d_counts, INT_LIMIT);
     throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
-
-    #ifdef DEBUG
-    cerr << endl;
-    cerr << "Print #4:" << endl;
-    debug_print_global_device_mem((uint32_t*)d_data, size);
-
-    cerr << "End!" << endl;
-    #endif
 
     // copy data back:
     throw_on_cuda_error(cudaMemcpy(h_data, d_data, sizeof(int32_t)*size, cudaMemcpyDeviceToHost));
@@ -314,6 +264,48 @@ void cuda_count_sort(int32_t* h_data, const uint32_t size){
     // Free data:
     throw_on_cuda_error(cudaFree(d_data));
     throw_on_cuda_error(cudaFree(d_counts));
+}
+
+
+// count sort on cpu inplace
+void cpu_count_sort(int32_t* data, uint32_t size){
+    if(!size){
+        return;
+    }
+
+    uint32_t* counter = new uint32_t[INT_LIMIT];
+    memset(counter, 0, INT_LIMIT*sizeof(uint32_t));
+
+    // histogram
+    for(uint32_t j = 0; j < size; j++){
+        ++counter[data[j]];
+    }
+
+    // exclusive scan
+    uint32_t sum = 0;
+    for(uint32_t j = 0; j < INT_LIMIT; ++j){
+        uint32_t temp = counter[j];
+        counter[j] = sum;
+        sum += temp;
+    }
+
+    // Sorting:
+
+    // without last element
+    for(uint32_t j = 0; j < INT_LIMIT - 1; ++j){
+        while(counter[j] < counter[j + 1]){
+            data[counter[j]++] = j;
+        }
+    }
+
+    // last element
+    {
+        while(counter[INT_LIMIT - 1] < size){
+            data[counter[INT_LIMIT - 1]++] = INT_LIMIT - 1;
+        }  
+    }
+
+    delete[] counter;
 }
 
 /*
@@ -359,7 +351,25 @@ int main(){
     try
     {
         // Launch cuda sort
+
+        #ifdef TIME_COUNT
+        auto start = steady_clock::now();
+        #endif
+
+        #ifdef SORT_GPU
         cuda_count_sort(data, data_size);
+        #else
+        cpu_count_sort(data, data_size);
+        #endif
+
+        #ifdef TIME_COUNT
+        auto end = steady_clock::now();
+        cerr << "===============================" << endl;
+        cerr << "INFERENCE TIME: ";
+        cerr << ((double)duration_cast<microseconds>(end - start).count()) / 1000.0 << "ms" << endl;
+        cerr << "===============================" << endl;
+        #endif
+
     }catch(const std::runtime_error& err){
         cerr << err.what() << endl;
         delete[] data;

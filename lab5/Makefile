@@ -15,7 +15,7 @@ all:
 	$(GCC) $(CFLAGS) -o $(CHECK) $(CSOURCE)
 
 test:
-	./$(GEN) temp_in.txt 10000000
+	./$(GEN) temp_in.txt 100000000
 	./$(BIN) < temp_in.txt > temp_out.txt
 	./$(CHECK) temp_in.txt temp_out.txt
 	rm temp_out.txt temp_in.txt
