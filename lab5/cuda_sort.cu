@@ -1,6 +1,7 @@
 // Made by Max Bronnikov
 #include <iostream>
 #include <vector>
+#include <stdexcept>
 
 #define INT_LIMIT 16777216 // 2^24
 // #define INT_LIMIT 64 // 2^24
