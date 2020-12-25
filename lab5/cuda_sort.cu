@@ -20,7 +20,7 @@
 #define AVOID_OFFSET(n) ((n) >> NUM_BANKS + (n) >> (LOG_NUM_BANKS << 1))
 
 
-#define TIME_COUNT // set for count time 
+#define RELEASE // TIME_COUNT // set for count time 
 #define SORT_GPU // set device for computing
 
 using namespace std;
