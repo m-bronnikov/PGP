@@ -10,7 +10,7 @@
 
 [Laboratory work №4 (Variant №4)](lab4) --- `Ready`
 
-[Laboratory work №5 (Variant №2)](lab5) --- *Not Ready*
+[Laboratory work №5 (Variant №2)](lab5) --- `Ready`
 
 [Laboratory work №6 (Variant №1)](lab6) --- *Not Ready*
 
