@@ -2,3 +2,8 @@ https://ru.wikipedia.org/wiki/%D0%90%D0%BB%D0%B3%D0%BE%D1%80%D0%B8%D1%82%D0%BC_%
 
 http://ray-tracing.ru/articles213.html
 
+http://math.hws.edu/graphicsbook/c8/s1.html
+
+https://www.thanassis.space/cudarenderer-BVH.html#recursion
+
+
