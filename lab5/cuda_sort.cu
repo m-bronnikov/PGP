@@ -122,7 +122,7 @@ void block_scan(const uint32_t tid, uint32_t* data, uint32_t* shared_temp, const
 // We think, that size % THREADS_X2 = 0 (it requirement to allocation procedure from host) 
 __global__
 void scan_step(uint32_t* data_in, const uint32_t size){
-    __shared__ uint32_t temp[THREADS_X2 * sizeof(uint32_t)];
+    __shared__ uint32_t temp[THREADS_X2];
 
     const uint32_t thread_id = threadIdx.x;
     const uint32_t start = blockIdx.x * THREADS_X2;
