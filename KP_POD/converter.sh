@@ -1,3 +1,6 @@
+# Made by Max Bronnikov
+# usage: bash converter.sh [path-to-data-images] [path-to-save-jpgs]
+
 mkdir -p $2
 rm $2/*
 for file in $1/*
