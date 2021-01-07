@@ -1,2 +1,4 @@
 *.asc
 */.vscode
+KP_POD/data/*
+KP_POD/res/*
