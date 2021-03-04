@@ -201,6 +201,10 @@ void scan(uint32_t* d_data, const uint32_t size){
 
 
 uint32_t cuda_clean_rays(recursion* d_rays, const uint32_t size, const float boarder = 0.005){
+    if(!size){
+        return 0;
+    }
+
     uint32_t good_count = 0;
     // device data:
     uint32_t* d_bins;
@@ -218,11 +222,10 @@ uint32_t cuda_clean_rays(recursion* d_rays, const uint32_t size, const float boa
         help_data_size*sizeof(uint32_t))
     );
     throw_on_cuda_error(cudaMalloc(
-        (void**)&d_rcopy, 
+        (void**)&d_rcopy,
         size*sizeof(recursion))
     );
-    
-    
+
     // set zeros
     throw_on_cuda_error(cudaMemset(d_bins, 0, size*sizeof(uint32_t))); 
 

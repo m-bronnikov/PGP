@@ -3,4 +3,4 @@ all: clear
 	nvcc -std=c++11 main.cu -o run
 
 clear:
-	rm run
+	rm -f run

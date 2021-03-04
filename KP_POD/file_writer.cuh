@@ -11,7 +11,8 @@ using namespace std;
 // FileWriter - class which gets GPU global memory buffer and writer img to file
 class FileWriter{
 public:
-    FileWriter(uint32_t w, uint32_t h, const string& modifier) : path_mod(modifier), size(w * h){
+    FileWriter(uint32_t w, uint32_t h, const string& modifier) 
+    : path_mod(modifier), size(w * h), width(w), height(h){
         h_data = new uint32_t[size];
         if(!h_data){
             throw runtime_error("Alloc Error");
@@ -40,6 +41,8 @@ private:
         // copy data to host
         throw_on_cuda_error(cudaMemcpy(h_data, d_data, size*sizeof(int32_t), cudaMemcpyDeviceToHost));
         // write data to stream
+        os.write(reinterpret_cast<char*>(&width), sizeof(uint32_t));
+        os.write(reinterpret_cast<char*>(&height), sizeof(uint32_t));
         os.write(reinterpret_cast<char*>(h_data), size * sizeof(uint32_t));
     }
 
@@ -49,8 +52,8 @@ private:
     uint32_t* h_data;
     //uint32_t* d_data;
     uint32_t size;
-    const uint32_t blocks = 256;
-    const uint32_t threads = 256;
+    uint32_t width;
+    uint32_t height;
 };
 
 
