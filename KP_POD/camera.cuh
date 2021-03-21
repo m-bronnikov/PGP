@@ -48,7 +48,7 @@ private:
         float_3 vx = norm(cross(vz, {0.0, 0.0, 1.0}));
         float_3 vy = norm(cross(vx, vz));
 
-        view_matrix = {vz, vx, vy};
+        view_matrix = {vx, vy, vz};
     }
 
 public:
@@ -71,7 +71,7 @@ public:
         return count_frames;
     }
 
-    float get_z_coord(){
+    float get_distance_to_viewer(){
         return view_z;
     }
 

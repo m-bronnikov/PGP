@@ -5,6 +5,8 @@
 
 typedef unsigned char uchar;
 
+#define EPSILON 1e-10
+
 struct uchar4 {
 	uchar x;
 	uchar y;
@@ -76,25 +78,39 @@ void build_space() {
 	printf("\n\n\n"); */
 }
 
+double triangle_intersected(vec3 dir, vec3 start, const trig* c_trig){
+    vec3 e1 = diff(c_trig->b, c_trig->a);
+    vec3 e2 = diff(c_trig->c, c_trig->a);
+    vec3 p = prod(dir, e2);
+    double div_n = dot(p, e1);
+
+    if (fabs(div_n) < EPSILON){
+        return -1.0f;
+    }
+
+    vec3 t = diff(start, c_trig->a);
+
+    double u = dot(p, t) / div_n;
+
+    vec3 q = prod(t, e1);
+
+    double v = dot(q, dir) / div_n;
+
+    double ts = dot(q, e2) / div_n;
+
+    // TODO: Investigate that if/else 3 times may slow our program, beter run if/else at ones?
+    if(u >= 0.0 && v >= 0.0 && v + u <= 1.0){
+        return ts;
+    }
+
+    return -1.0f;
+}
+
 uchar4 ray(vec3 pos, vec3 dir) {
 	int k, k_min = -1;
 	double ts_min;
 	for(k = 0; k < 6; k++) {
-		vec3 e1 = diff(trigs[k].b, trigs[k].a);
-		vec3 e2 = diff(trigs[k].c, trigs[k].a);
-		vec3 p = prod(dir, e2);
-		double div = dot(p, e1);
-		if (fabs(div) < 1e-10)
-			continue;
-		vec3 t = diff(pos, trigs[k].a);
-		double u = dot(p, t) / div;
-		if (u < 0.0 || u > 1.0)
-			continue;
-		vec3 q = prod(t, e1);
-		double v = dot(q, dir) / div;
-		if (v < 0.0 || v + u > 1.0)
-			continue;
-		double ts = dot(q, e2) / div; 	
+		double ts = triangle_intersected(dir, pos, &trigs[k]); 	
 		if (ts < 0.0)
 			continue;
 		if (k_min == -1 || ts < ts_min) {

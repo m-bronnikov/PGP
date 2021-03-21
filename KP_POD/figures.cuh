@@ -11,7 +11,7 @@
 
 using namespace std;
 
-#define DIST_EPS 1e-8
+#define DIST_EPS 1e-5
 
 
 class Figure3d{
@@ -23,9 +23,14 @@ protected:
 public:
     Figure3d(const float_3& center_pos, const material& glass_mat) : center_coords(center_pos), trig_material(glass_mat){}
 
-    void render_figure(vector<triangle>& triangles) const{
+    void render_figure(vector<triangle>& triangles, vector<light_point>& light_sources) const{
         split_line_triangles(triangles);
         split_edge_triangles(triangles);
+        turn_on_lights(light_sources);
+    }
+
+    void turn_on_lights(vector<light_point>& light_sources) const{
+        light_sources.push_back({center_coords, diod_energy_color, diod_energy_power});
     }
 
 protected:
@@ -67,7 +72,6 @@ protected:
             // 1) compute vector of transform:
             float_3 transform = norm(vertexes[line_idx.first] + vertexes[line_idx.second]);
             float_3 gap = norm(cross(transform, vertexes[line_idx.second] - vertexes[line_idx.first]));
-            float_3 normal = transform;
             // lens of transform and gap
             gap *= lamp_radius;
 
@@ -79,7 +83,6 @@ protected:
                 vertexes[line_idx.first] + transform + gap, 
                 vertexes[line_idx.first] + transform - gap, 
                 vertexes[line_idx.second] + transform - gap, 
-                normal,
                 material_id
             }));
 
@@ -87,7 +90,6 @@ protected:
                 vertexes[line_idx.second] + transform + gap, 
                 vertexes[line_idx.second] + transform - gap, 
                 vertexes[line_idx.first] + transform + gap, 
-                normal,
                 material_id
             }));
 
@@ -110,7 +112,6 @@ protected:
                     center_coords + up, 
                     center_coords - gap, 
                     center_coords + gap, 
-                    normal,
                     material_id
                 }));
             }
@@ -122,6 +123,10 @@ protected:
     const float lamp_radius = 0.001;
     const material angleline_material = {{0, 0, 0}, 0.75, 0, 0};
     const material diod_material = {{0.85, 0.85, 0.85}, 0.8, 0.9, 0};
+
+    // Note: We call energy - light source from center of figure
+    const float_3 diod_energy_color = {0.8f, 0.8f, 1.0f};
+    const float diod_energy_power = 0.7f;
 
     material trig_material;
 
@@ -179,29 +184,25 @@ private:
             }
 
             transform = norm(transform);
-            float_3 normal = transform;
             transform *= lamp_radius / sin((M_PI - angle_between_edges) / 2.0);
 
             // add triangles
             triangles.push_back(triangle_to_earth_coords({
                 vertexes[edge_idxs[0]] + transform, 
                 vertexes[edge_idxs[1]] + transform, 
-                vertexes[edge_idxs[2]] + transform, 
-                normal,
+                vertexes[edge_idxs[2]] + transform,
                 material_id
             }));
             triangles.push_back(triangle_to_earth_coords({
                 vertexes[edge_idxs[2]] + transform, 
                 vertexes[edge_idxs[3]] + transform, 
                 vertexes[edge_idxs[4]] + transform, 
-                normal,
                 material_id
             }));
             triangles.push_back(triangle_to_earth_coords({
                 vertexes[edge_idxs[4]] + transform, 
                 vertexes[edge_idxs[2]] + transform, 
                 vertexes[edge_idxs[0]] + transform, 
-                normal,
                 material_id
             }));
         }
@@ -246,6 +247,131 @@ private:
         };
     }
 };
+
+
+
+class Cube : public Figure3d{
+public:
+    Cube(const float_3& position, const material& glass_mat, float radius_o, uint8_t line_lamps) 
+    : Figure3d(position, glass_mat){
+        // set Dodecaedr params:
+        lamps_per_line = line_lamps;
+        angle_between_edges = M_PI_2;
+                        
+        // generate Dodecaedr
+        generate_figure(radius_o);
+    }
+
+private:
+    // this function generates vertexes of Dodecaedr with R = 1
+    void generate_vertexes() final{
+        vertexes = {
+            {-1, -1, -1}, // 0
+            {-1, -1, 1}, // 1
+            {-1, 1, -1}, // 2
+            {-1, 1, 1}, // 3
+            {1, -1, -1}, // 4
+            {1, -1, 1}, // 5
+            {1, 1, -1}, // 6
+            {1, 1, 1}  // 7
+        };
+    }
+
+    void split_edge_triangles(vector<triangle>& triangles) const final{
+        uint32_t material_id = MaterialTable().get_material_id(trig_material);
+
+        // 1
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[0], 
+            vertexes[1], 
+            vertexes[3], 
+            material_id
+        }));
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[0], 
+            vertexes[2], 
+            vertexes[3], 
+            material_id
+        }));
+
+        // 2
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[1], 
+            vertexes[5], 
+            vertexes[7], 
+            material_id
+        }));
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[1], 
+            vertexes[3], 
+            vertexes[7], 
+            material_id
+        }));
+
+        // 3
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[4], 
+            vertexes[5], 
+            vertexes[7], 
+            material_id
+        }));
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[4], 
+            vertexes[6], 
+            vertexes[7], 
+            material_id
+        }));
+
+        // 4
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[0], 
+            vertexes[4], 
+            vertexes[6], 
+            material_id
+        }));
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[0], 
+            vertexes[2], 
+            vertexes[6], 
+            material_id
+        }));
+
+        // 5
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[0], 
+            vertexes[1], 
+            vertexes[5], 
+            material_id
+        }));
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[0], 
+            vertexes[4], 
+            vertexes[5], 
+            material_id
+        }));
+
+        // 6
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[2], 
+            vertexes[3], 
+            vertexes[7], 
+            material_id
+        }));
+        triangles.push_back(triangle_to_earth_coords({
+            vertexes[2], 
+            vertexes[6], 
+            vertexes[7], 
+            material_id
+        }));
+    }
+
+private:
+    // init lines and edges description
+    void set_lines_edges(){
+        // pass
+    }
+};
+
 
 
 // TODO: Define here another figures

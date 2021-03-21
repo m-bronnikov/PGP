@@ -20,7 +20,7 @@ public:
         return table[mat] = size;
     }
 
-    void save_to_vector(std::vector<material> vec){
+    void save_to_vector(std::vector<material>& vec){
         vec.resize(table.size());
         for(auto it : table){
             vec[it.second] = it.first;

@@ -19,7 +19,6 @@ public:
         }
     }
 
-
     ~FileWriter(){
         delete[] h_data;
     }

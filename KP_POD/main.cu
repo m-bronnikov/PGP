@@ -11,6 +11,14 @@
 
 using namespace std;
 
+/*
+Not Done:
+    1. Textures
+    2. Bugs resolution
+    3. InfoLogs with time computations
+    4. Documental comments
+*/
+
 
 int main(){
 

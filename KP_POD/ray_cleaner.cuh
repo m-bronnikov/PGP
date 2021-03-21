@@ -18,6 +18,44 @@
 
 using namespace std;
 
+// TODO Remove this
+// uint32_t count_good_rays(recursion* d_data, uint32_t size = 2457600){
+//     recursion* h_data = new recursion[size];
+//     throw_on_cuda_error(cudaMemcpy(h_data, d_data, sizeof(recursion)*size, cudaMemcpyDeviceToHost));
+
+//     uint32_t counter = 0;
+//     for(uint32_t i = 0; i < size; ++i){
+//         if(h_data[i].power >= 0.005){
+//             counter++;
+//         }
+//     }
+
+//     delete[] h_data;
+
+//     return counter;
+// }
+
+// uint32_t is_sorted(uint32_t* d_data, uint32_t size = 2457600){
+//     uint32_t* h_data = new uint32_t[size];
+//     throw_on_cuda_error(cudaMemcpy(h_data, d_data, sizeof(uint32_t)*size, cudaMemcpyDeviceToHost));
+
+//     uint32_t last = 0;
+//     bool ans = true;
+
+//     for(uint32_t i = 0; i < size; ++i){
+//         if(h_data[i] < last){
+//             ans = false;
+//             break;
+//         }
+//     }
+
+//     delete[] h_data;
+
+//     return ans;
+// }
+
+
+
 ///////////////////////////////////////////////////////////////////////
 //////////////////////// DEVICE CODE //////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
@@ -124,8 +162,6 @@ void add_block_sums(uint32_t* data, const uint32_t* sums, const uint32_t sums_co
     }
 }
 
-// sort with precomputed data 
-// ref: https://www.researchgate.net/publication/245542734
 __global__
 void sort_by_bins(
     recursion* rays, const recursion* copy, 
@@ -206,13 +242,13 @@ uint32_t cuda_clean_rays(recursion* d_rays, const uint32_t size, const float boa
     }
 
     uint32_t good_count = 0;
-    // device data:
+    
     uint32_t* d_bins;
     uint32_t* d_sums;
     recursion* d_rcopy;
 
     uint32_t help_data_size = compute_offset(size, CLEAN_THREADS_X2);
-    // alloc mem
+    
     throw_on_cuda_error(cudaMalloc(
         (void**)&d_bins, 
         size*sizeof(uint32_t))
@@ -226,7 +262,7 @@ uint32_t cuda_clean_rays(recursion* d_rays, const uint32_t size, const float boa
         size*sizeof(recursion))
     );
 
-    // set zeros
+    // step 0: init bins as 0
     throw_on_cuda_error(cudaMemset(d_bins, 0, size*sizeof(uint32_t))); 
 
     // step 1: compute binary set on gpu
@@ -243,7 +279,9 @@ uint32_t cuda_clean_rays(recursion* d_rays, const uint32_t size, const float boa
     throw_on_cuda_error(cudaMemcpy(&good_count, d_sums + (size - 1), sizeof(int32_t), cudaMemcpyDeviceToHost));
 
     // step 3: move all good rays to start of array
-    // use 1 for inplace sort
+    // copy all data to d_rcopy for inplace sort:
+    throw_on_cuda_error(cudaMemcpy(d_rcopy, d_rays, sizeof(recursion)*size, cudaMemcpyDeviceToDevice));
+    // "sort" bins here (strictly speaking, this is not really a sort)
     sort_by_bins<<<CLEAN_BLOCKS, CLEAN_THREADS>>>(d_rays, d_rcopy, d_bins, d_sums, size);
     throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
 
