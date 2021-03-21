@@ -1,5 +1,11 @@
 # Programing of Graphical Processors
 
+## Content
+
+Here presented all my labs and course projects for **PGP/POD** subjects. All tasks you can find inside corresponding folders.
+
+*P.S.* Unfortunately some tasks descriptions may be differ a bit from source. But in generall tasks matches to works.
+
 ## Laboratory works
 
 [Laboratory work №1 (Variant №4)](lab1) --- `Ready`
