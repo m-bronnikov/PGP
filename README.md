@@ -12,7 +12,7 @@
 
 [Laboratory work №5 (Variant №2)](lab5) --- `Ready`
 
-[Laboratory work №6 (Variant №1)](lab6) --- *Not Ready*
+[Laboratory work №6 (Variant №1)](lab6) --- `Skipped`
 
 [Laboratory work №7 (Variant №4)](lab7) --- `Ready`
 
@@ -22,9 +22,9 @@
 
 ## Course projects
 
-[POD Course project (Variant №4)](KP_POD) --- *Not Ready*
+[POD Course project (Variant №4)](KP_POD) --- `In progress`
 
-[PGP Course project (Variant №1)](KP_PGP) --- *Not Ready*
+[PGP Course project (Variant №1)](KP_PGP) --- `Not Ready`
 
 ## Investigation
 
