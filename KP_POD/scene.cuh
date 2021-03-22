@@ -87,14 +87,14 @@ public:
         // get vector of materials
         MaterialTable().save_to_vector(render_maters);
 
-        for(int i = 0; i < render_maters.size(); ++i){
-            cout << "Material #" << i << ":" << endl;
-            cout << "diffusion" << render_maters[i].diffussion << endl;
-            cout << "reflection" << render_maters[i].reflection << endl;
-            cout << "refraction" << render_maters[i].refraction << endl;
+        // TODO Remove this
+        // for(int i = 0; i < render_triangles.size(); ++i){
+        //     cout << "Triangle №" << i + 1 << ":" << endl;
 
-            cout << "color: " << render_maters[i].color.x << " " << render_maters[i].color.y << " " << render_maters[i].color.z << endl; 
-        }
+        //     cout << "A: (" << render_triangles[i].a.x << ", " << render_triangles[i].a.y << ", " << render_triangles[i].a.z << ")" << endl;
+        //     cout << "B: (" << render_triangles[i].b.x << ", " << render_triangles[i].b.y << ", " << render_triangles[i].b.z << ")" << endl;
+        //     cout << "C: (" << render_triangles[i].c.x << ", " << render_triangles[i].c.y << ", " << render_triangles[i].c.z << ")" << endl;
+        // }
 
         // Scene parameters:
         cout << "Scene Parametrs" << endl;

@@ -11,107 +11,257 @@
 
 using namespace std;
 
-#define DIST_EPS 1e-5
+#define DIST_EPS 5e-4
 
+/*
+    Note: Abstract class of 3D Figure
 
+    This class can:
+        1. Add triangles and lights to scene with method `render_figures`
+        2. It's possible to set radius of figure and position of center
+        3. Method `render_figures` generates lights and edges separately
+*/
 class Figure3d{
 protected:
     using point = float_3;
     using line = pair<uint8_t, uint8_t>;
     using edge = vector<uint8_t>;
+    using color = float_3;
 
 public:
-    Figure3d(const float_3& center_pos, const material& glass_mat) : center_coords(center_pos), trig_material(glass_mat){}
+    /*
+        Note: Constructor for Figure
 
+        Takes radius of figure, position of center and material of edges
+    */
+    Figure3d(float radius, const point& center_position, const material& glass_mat, uint8_t diods_on_line) 
+    : figure_radius(radius), coordinats_of_center(center_position), trig_material(glass_mat), diods_per_line(diods_on_line){
+        // We will make radius of diod depndent from radius of figure:
+        diod_radius *= figure_radius;
+    }
+
+    /*
+        Note: Generation triangles and lights.
+
+        This class should be called from scene class. Adds triangles and light source to scene.        
+    */
     void render_figure(vector<triangle>& triangles, vector<light_point>& light_sources) const{
         split_line_triangles(triangles);
         split_edge_triangles(triangles);
         turn_on_lights(light_sources);
     }
 
-    void turn_on_lights(vector<light_point>& light_sources) const{
-        light_sources.push_back({center_coords, diod_energy_color, diod_energy_power});
-    }
-
 protected:
-    void generate_figure(float radius_o){
-        generate_vertexes();
-        scale_vertexes(radius_o);
+
+    /*
+        Note: Preprocessing of data
+
+        This method makes computation to generate vertexes and scales them with radius.
+    */
+    void generate_figure(){
+        generate_figure_vertexes();
+        scale_vertexes();
     }
 
-    void scale_vertexes(float radius){
+    /*
+        Note: Scale
+
+        This method scale each vertex with figure radius in local coords.
+    */
+    void scale_vertexes(){
         for(auto& v : vertexes){
-            v *= radius;
+            v *= figure_radius;
         }
     }
 
+    /*
+        Note: Moving
+
+        This class moves each triangle to coordinates of figure center.
+    */
     triangle triangle_to_earth_coords(const triangle& single_triangle) const{
         triangle result = single_triangle;
         
-        result.a += center_coords; 
-        result.b += center_coords; 
-        result.c += center_coords;
+        result.a += coordinats_of_center; 
+        result.b += coordinats_of_center; 
+        result.c += coordinats_of_center;
         
         return result;
     }
 
 protected:
-    // this function generates vertexes of figure with R = 1
-    virtual void generate_vertexes() = 0;
+    /*
+        Note: Vertex generation
 
-    // this function split each edge to triangles
+        This class generates vertexes of figure with radius equal to 1. 
+        For each figure type algorihm diffrent.
+    */
+    virtual void generate_figure_vertexes() = 0;
+
+    /*
+        Note: Edge generation.
+        This class generates edges from vertexes and push back to scene vector.
+    */
     virtual void split_edge_triangles(vector<triangle>& triangles) const = 0;
 
 protected:
-    // this function split each angle to triangles
+
+    /*
+        Note: Turn lights on.
+
+        In our algorithm diods from lines - just white triangles with real light source in center of figure.
+        This method add's this source to scene.
+    */
+    void turn_on_lights(vector<light_point>& light_sources) const{
+        light_sources.push_back({coordinats_of_center, diod_energy_color, diod_energy_power});
+    }
+
+    /*
+        Note: Lines generation.
+
+        This methods produce lines for figure in 2 steps:
+            1. Generation of box for black line.
+            2. Adding diods to this box.
+    */
     void split_line_triangles(vector<triangle>& triangles) const{
-        uint32_t material_id = MaterialTable().get_material_id(angleline_material);
+        // Get id of line material properties from table.
+        uint32_t material_id = MaterialTable().get_material_id(material_od_boxes);
 
-        for(auto& line_idx : lines){
-            // work with angle here.   
-            // 1) compute vector of transform:
-            float_3 transform = norm(vertexes[line_idx.first] + vertexes[line_idx.second]);
-            float_3 gap = norm(cross(transform, vertexes[line_idx.second] - vertexes[line_idx.first]));
-            // lens of transform and gap
-            gap *= lamp_radius;
+        /*
+            Note: Geration of box with diods.
 
-            transform *= lamp_radius / tan((M_PI - angle_between_edges) / 2.0); 
+            Decided to make box on small distance from geometrical lines.
+            Let's imagine projection of geomterical edge intersection:
+
+                                        /\
+                                       /  \
+                                      /    \
+
+            We will transform this intersection to following (with diods `o`):
+                              y |        _
+                               /|\      /o\
+                                |      /   \
+                                |     /     \       x
+                                |__________________\__    
+                                                   /
+
+            Therefore it's needed to define lenght of transforming by axes `x` ans `y`:
+                1. Transfroming by axes `x` we will define using predefined 
+                   constant formula dependent to diod_radius:
+                        `x_transform = box_width_coefficent * diod_radius`
+                2. If we know `angle` between edges it's possible to find transform by `y`:
+                            `y_transform =  box_width * ctg((Pi - angle)/2)`
+                    
+                    P.S. It's hard to improve this formula here. Just bellive! =)
+        */
+        for(auto& line_points : lines){
+            /*
+                Note: Vectors of `x` and `y` axes on projection in local coords:
+
+                Let's imagine line:
+                                    line
+                             v1 o---------o v2
+                                 \_    _ /
+                                 |\     /\
+                                b  \   /  a
+                                    \ /
+                                     O(0, 0) - center of local coords
+
+                Therefore `y` axes(vector to mid of lines) can be defined as:
+                            `y_transform = a + b`
+
+                                     | y
+                                    /|\
+                                     |
+                             v1 o----|----o v2
+                                 \_  | _ /
+                                 |\  |  /\
+                                b  \ | /  a
+                                    \|/
+                                     O(0, 0, 0) - center of local coords     z
+                                     ___________________________________\___
+                                                                        /
+                Therefore `x` axes can be defined as:
+                    `x_transform = cross(y_transform, v2 - v1) = cross(y_transform, z_transform)` 
+            */
+            float_3 transform_by_y = norm(vertexes[line_points.first] + vertexes[line_points.second]);
+            float_3 transform_by_z = norm(vertexes[line_points.second] - vertexes[line_points.first]);
+            float_3 transform_by_x = norm(cross(transform_by_y, transform_by_z));
+            {
+                float len_of_x_transform = diod_radius * box_width_factor;
+                float len_of_y_transfrom = len_of_x_transform / tan((M_PI - angle_between_edges) / 2.0);
+
+                // scale vectors
+                transform_by_x *= len_of_x_transform;
+                transform_by_y *= len_of_y_transfrom;
+            }
 
             
-            // 2) generate 2 triangles for agle
-            triangles.push_back(triangle_to_earth_coords({
-                vertexes[line_idx.first] + transform + gap, 
-                vertexes[line_idx.first] + transform - gap, 
-                vertexes[line_idx.second] + transform - gap, 
+            /*
+                Note: Generate line box.
+
+                Each line - rectangle. Therefor we use 2 triangles.
+            */
+            triangles.push_back(triangle_to_earth_coords(triangle{
+                vertexes[line_points.first] + transform_by_y + transform_by_x, 
+                vertexes[line_points.first] + transform_by_y - transform_by_x, 
+                vertexes[line_points.second] + transform_by_y - transform_by_x, 
                 material_id
             }));
 
-            triangles.push_back(triangle_to_earth_coords({
-                vertexes[line_idx.second] + transform + gap, 
-                vertexes[line_idx.second] + transform - gap, 
-                vertexes[line_idx.first] + transform + gap, 
+            triangles.push_back(triangle_to_earth_coords(triangle{
+                vertexes[line_points.second] + transform_by_y + transform_by_x, 
+                vertexes[line_points.second] + transform_by_y - transform_by_x, 
+                vertexes[line_points.first] + transform_by_y + transform_by_x, 
                 material_id
             }));
 
-            // 3) generate lamp balls
-            material_id = MaterialTable().get_material_id(diod_material);
-            transform *= (1 - DIST_EPS);
-            float_3 start = vertexes[line_idx.first];
-            for(uint8_t i = 1; i <= lamps_per_line; ++i){
-                float_3 add = (vertexes[line_idx.second] - vertexes[line_idx.first]);
-                float_3 up = norm(add);
+            /* 
+                Note: Diods generation.
 
-                up *= lamp_radius;
-                add *= ((float) i) / ((float) (lamps_per_line + 1));
+                We are define each diod as litlle blicly triangle, which located inside on line box.
+                In order to place diod into Figure we reduce vector of transform a bit.  
+            */
+            material_id = MaterialTable().get_material_id(material_od_diods);
+            transform_by_y *= (1 - DIST_EPS);
 
-                // center of lamp ball, radius of ball, color of lamp, power of lamp
+            /*
+                Note: Positions of diods.
 
-                float_3 center_coords = start + add + transform;
+                We are map diods on line with constant step from start to end position of line.
 
-                triangles.push_back(triangle_to_earth_coords({
-                    center_coords + up, 
-                    center_coords - gap, 
-                    center_coords + gap, 
+                Therefore we need to define center position of each diod and create corresponding
+                triangle with `diod_radius`:
+
+                                | line box |
+                                |          |
+                                |    /\    |
+                                |   /  \   |
+                                |  /    \  |
+                                | /_diod_\ |
+                                |          |
+                                |          |
+                                |    /\    |
+                                |   /  \   |
+                                |  /    \  |
+                                | /_diod_\ |
+                                |          |
+            */ 
+            transform_by_x = norm(transform_by_x) * diod_radius;
+            transform_by_z = norm(transform_by_z) * diod_radius;
+
+            point start_position = vertexes[line_points.first];
+            point end_position = vertexes[line_points.second];
+
+            for(uint8_t i = 1; i <= diods_per_line; ++i){
+                float_3 add_to_start = (end_position - start_position) * ((float) i) / ((float) (diods_per_line + 1));
+
+                point center_of_diod = start_position + add_to_start + transform_by_y;
+
+                triangles.push_back(triangle_to_earth_coords(triangle{
+                    center_of_diod + transform_by_z, 
+                    center_of_diod - transform_by_x, 
+                    center_of_diod + transform_by_x, 
                     material_id
                 }));
             }
@@ -119,87 +269,124 @@ protected:
     }
 
 protected:
-    uint8_t lamps_per_line;
-    const float lamp_radius = 0.001;
-    const material angleline_material = {{0, 0, 0}, 0.75, 0, 0};
-    const material diod_material = {{0.85, 0.85, 0.85}, 0.8, 0.9, 0};
-
-    // Note: We call energy - light source from center of figure
-    const float_3 diod_energy_color = {0.8f, 0.8f, 1.0f};
-    const float diod_energy_power = 0.7f;
-
+// parameters, defined by user:
+    uint8_t diods_per_line;
+    const float figure_radius;
     material trig_material;
 
+// constant parameters, defined by developer
+    float diod_radius = 0.015f;
+    const float box_width_factor = 2.0f;
+
+    const material material_od_boxes = material{color{0, 0, 0}, 0.85, 0, 0};
+    const material material_od_diods = material{color{0.85, 0.85, 0.85}, 0.9, 0.9, 0};
+
+    const color diod_energy_color = color{0.8f, 0.8f, 1.0f};
+    const float diod_energy_power = 0.8f;
+
+// constant paramters dependent to Figure type
     vector<line> lines;
     vector<edge> edges;
+    vector<point> vertexes;
 
     float angle_between_edges;
-    const float_3 center_coords;
-
-    vector<point> vertexes;
+    const point coordinats_of_center;
 };
 
 
-
+/*
+    Note: Class of Dodecaedr
+*/
 class Dodecaedr : public Figure3d{
 public:
-    Dodecaedr(const float_3& position, const material& glass_mat, float radius_o, uint8_t line_lamps) 
-    : Figure3d(position, glass_mat){
-        // set Dodecaedr params:
-        lamps_per_line = line_lamps;
+    Dodecaedr(float radius_of_figure, const float_3& center_position, const material& glass_material, uint8_t diods_on_line) 
+    : Figure3d(radius_of_figure, center_position, glass_material, diods_on_line){
+        // Generate Dodecaedr data:
         angle_between_edges = 2.034443043;
-
-        set_lines_edges();
-                
-        // generate Dodecaedr
-        generate_figure(radius_o);
+        set_lines_and_edges_of_figure();
+        generate_figure();
     }
 
 private:
-    // this function generates vertexes of Dodecaedr with R = 1
-    void generate_vertexes() final{
+    /*
+        Note: Vertexes of Dodecaedr
+
+        Generation of Dodecaedr's vertexes based on icosaedr vertexes.
+        ref: https://works.doklad.ru/view/1SxrxyeGZoA.html
+    */
+    void generate_figure_vertexes() final{
         vertexes.resize(20);
 
         const vector<uint8_t> G0 = {0, 2, 4, 6, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 3, 5, 7, 9};
         const vector<uint8_t> G1 = {10, 10, 10, 10, 10, 2, 2, 4, 4, 6, 6, 8, 8, 0, 0, 11, 11, 11, 11, 11};
         const vector<uint8_t> G2 = {2, 4, 6, 8, 0, 1, 3, 3, 5, 5, 7, 7, 9, 9, 1, 9, 1, 3, 5, 7};
 
-        vector<point> ico_vertxs;
-        generate_icosaedr(ico_vertxs);
+        vector<point> ico_vertexes;
+        generate_icosaedr_vertexes(ico_vertexes);
 
         // coords of Dodecaedr:
         for(uint8_t i = 0; i < 20; ++i){
-            vertexes[i] = ico_vertxs[G0[i]] + ico_vertxs[G1[i]] + ico_vertxs[G2[i]];
-            vertexes[i] /= 3.0;
+            vertexes[i] = ico_vertexes[G0[i]] + ico_vertexes[G1[i]] + ico_vertexes[G2[i]];
+            vertexes[i] /= 3.0f;
         }
     }
 
+    /*
+        Note: Edges of Dodecaedr
+
+        This method generates and pushes triangles of edges to scene.
+    */
     void split_edge_triangles(vector<triangle>& triangles) const final{
         uint32_t material_id = MaterialTable().get_material_id(trig_material);
 
+        // For each edge:
         for(auto& edge_idxs : edges){
+            /*
+                Note: Moving to line boxes.
+
+                As described above, we use transform of lines to produce boxes and diods. 
+                Here we should transform edges in order to join them with line boxes.
+
+                Let's use parrallel move of all vertexes of edges for that. Direction of transformation move - 
+                the center of gravity of edge's vertexes (and in same time ortogonal vector to this edge).
+
+                Distance of transform defined as:
+                        `len_of_transform = transform_x / sin((Pi - angle)/2)`
+
+                Value of `transform_x` defined above! Improvement of this formula also deprecated. Please believe =)
+            */
+    
+            // Center of gravity computation:
             float_3 transform = {0.0, 0.0, 0.0};
             for(auto v_idx : edge_idxs){
                 transform += vertexes[v_idx];
             }
 
-            transform = norm(transform);
-            transform *= lamp_radius / sin((M_PI - angle_between_edges) / 2.0);
+            {
+                float len_of_x_transform = diod_radius * box_width_factor;
+                float len_of_transform = len_of_x_transform / sin((M_PI - angle_between_edges) / 2.0);
 
-            // add triangles
-            triangles.push_back(triangle_to_earth_coords({
+                transform = norm(transform) * len_of_transform;
+            }
+
+            // Info: Incomment this if you want a gap's beetwen edges and boxes.
+            // transform *=  0.0f;
+
+
+            // Generate triangles:
+            triangles.push_back(triangle_to_earth_coords(triangle{
                 vertexes[edge_idxs[0]] + transform, 
                 vertexes[edge_idxs[1]] + transform, 
                 vertexes[edge_idxs[2]] + transform,
                 material_id
             }));
-            triangles.push_back(triangle_to_earth_coords({
+            triangles.push_back(triangle_to_earth_coords(triangle{
                 vertexes[edge_idxs[2]] + transform, 
                 vertexes[edge_idxs[3]] + transform, 
                 vertexes[edge_idxs[4]] + transform, 
                 material_id
             }));
-            triangles.push_back(triangle_to_earth_coords({
+            triangles.push_back(triangle_to_earth_coords(triangle{
                 vertexes[edge_idxs[4]] + transform, 
                 vertexes[edge_idxs[2]] + transform, 
                 vertexes[edge_idxs[0]] + transform, 
@@ -209,12 +396,17 @@ private:
     }
 
 private:
-    // this function generates vertexes of icosaedr with Ro = 1.118
-    void generate_icosaedr(vector<point>& ico_vertxs) const{
+    /* 
+        Note: Icosaedr
+
+        This function generates vertexes of icosaedr with radius equal to 1.
+    */
+    void generate_icosaedr_vertexes(vector<point>& ico_vertxs) const{
         ico_vertxs.resize(12);
+
         float h = 0.5;
         const float Ro = 1.118034;
-        // coords of icosaedr
+        
         for(uint8_t i = 0; i < 10; ++i){
             ico_vertxs[i] = {
                 static_cast<float>(cos(i * M_PI / 5.0f)), 
@@ -223,12 +415,17 @@ private:
             };
             h *= -1.0;
         }
+
         ico_vertxs[10] = {0, Ro, 0};
         ico_vertxs[11] = {0, -Ro, 0};   
     }
 
-    // init lines and edges description
-    void set_lines_edges(){
+    /*
+        Note: Lines and Edges
+
+        In generated array of vertexes we can distill folowing lines and edges: 
+    */
+    void set_lines_and_edges_of_figure(){
         lines = {
             {0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 0}, {0, 5}, {5, 6},
             {6, 7}, {7, 1}, {8, 7}, {9, 8}, {2, 9}, {9, 10}, {10, 11},
@@ -237,7 +434,7 @@ private:
             {19, 12}, {15, 19}
         };
 
-        vector<edge> edges = {
+        edges = {
             {0, 1, 2, 3, 4}, {15, 16, 17, 18, 19},
             {6, 7, 8, 17, 16}, {6, 5, 14, 15, 16},
             {12, 13, 14, 15, 19}, {18, 19, 12, 11, 10},
@@ -249,22 +446,24 @@ private:
 };
 
 
+/*
+    Note: Class of Simple Cube
 
+    It's made for testing. May be removed!
+*/
 class Cube : public Figure3d{
 public:
-    Cube(const float_3& position, const material& glass_mat, float radius_o, uint8_t line_lamps) 
-    : Figure3d(position, glass_mat){
-        // set Dodecaedr params:
-        lamps_per_line = line_lamps;
+    Cube(float radius_o, const float_3& position, const material& glass_mat, uint8_t line_lamps) 
+    : Figure3d(radius_o, position, glass_mat, line_lamps){
         angle_between_edges = M_PI_2;
                         
         // generate Dodecaedr
-        generate_figure(radius_o);
+        generate_figure();
     }
 
 private:
     // this function generates vertexes of Dodecaedr with R = 1
-    void generate_vertexes() final{
+    void generate_figure_vertexes() final{
         vertexes = {
             {-1, -1, -1}, // 0
             {-1, -1, 1}, // 1
@@ -367,7 +566,7 @@ private:
 
 private:
     // init lines and edges description
-    void set_lines_edges(){
+    void set_lines_and_edges_of_figure(){
         // pass
     }
 };

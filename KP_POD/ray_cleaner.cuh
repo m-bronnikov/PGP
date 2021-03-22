@@ -18,44 +18,6 @@
 
 using namespace std;
 
-// TODO Remove this
-// uint32_t count_good_rays(recursion* d_data, uint32_t size = 2457600){
-//     recursion* h_data = new recursion[size];
-//     throw_on_cuda_error(cudaMemcpy(h_data, d_data, sizeof(recursion)*size, cudaMemcpyDeviceToHost));
-
-//     uint32_t counter = 0;
-//     for(uint32_t i = 0; i < size; ++i){
-//         if(h_data[i].power >= 0.005){
-//             counter++;
-//         }
-//     }
-
-//     delete[] h_data;
-
-//     return counter;
-// }
-
-// uint32_t is_sorted(uint32_t* d_data, uint32_t size = 2457600){
-//     uint32_t* h_data = new uint32_t[size];
-//     throw_on_cuda_error(cudaMemcpy(h_data, d_data, sizeof(uint32_t)*size, cudaMemcpyDeviceToHost));
-
-//     uint32_t last = 0;
-//     bool ans = true;
-
-//     for(uint32_t i = 0; i < size; ++i){
-//         if(h_data[i] < last){
-//             ans = false;
-//             break;
-//         }
-//     }
-
-//     delete[] h_data;
-
-//     return ans;
-// }
-
-
-
 ///////////////////////////////////////////////////////////////////////
 //////////////////////// DEVICE CODE //////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
@@ -162,6 +124,7 @@ void add_block_sums(uint32_t* data, const uint32_t* sums, const uint32_t sums_co
     }
 }
 
+// TODO Optimize this to inplace sorting!
 __global__
 void sort_by_bins(
     recursion* rays, const recursion* copy, 

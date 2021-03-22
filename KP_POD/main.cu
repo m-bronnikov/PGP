@@ -79,8 +79,8 @@ int main(){
     cin >> radius;
     cin >> reflection >> refraction;
     cin >> line_lights; 
-    material fig_glass = {color, 1.0, reflection, refraction}; // set diffusion as 1 by default
-    scene.add_figure(Dodecaedr(center, fig_glass, radius, line_lights));
+    material fig_glass = {color, 0.5, reflection, refraction}; // set diffusion as 1 by default
+    scene.add_figure(Dodecaedr(radius, center, fig_glass, line_lights));
 
     // dodecaedr:
     cin >> center.x >> center.y >> center.z;
@@ -89,7 +89,7 @@ int main(){
     cin >> reflection >> refraction;
     cin >> line_lights; 
     fig_glass = {color, 1.0, reflection, refraction}; // set diffusion as 1 by default
-    scene.add_figure(Dodecaedr(center, fig_glass, radius, line_lights));
+    //scene.add_figure(Dodecaedr(radius, center, fig_glass, line_lights));
 
     // dodecaedr:
     cin >> center.x >> center.y >> center.z;
@@ -98,7 +98,7 @@ int main(){
     cin >> reflection >> refraction;
     cin >> line_lights; 
     fig_glass = {color, 1.0, reflection, refraction}; // set diffusion as 1 by default
-    scene.add_figure(Dodecaedr(center, fig_glass, radius, line_lights));
+    //scene.add_figure(Dodecaedr(radius, center, fig_glass, line_lights));
 
     // 6.
     cin >> floor_A.x >> floor_A.y >> floor_A.z;
