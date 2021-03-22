@@ -124,8 +124,10 @@ protected:
             2. Adding diods to this box.
     */
     void split_line_triangles(vector<triangle>& triangles) const{
-        // Get id of line material properties from table.
-        uint32_t material_id = MaterialTable().get_material_id(material_od_boxes);
+        // Get id of material properties from table.
+        uint32_t box_material_id = MaterialTable().get_material_id(material_od_boxes);
+        uint32_t diod_material_id = MaterialTable().get_material_id(material_od_diods);
+
 
         /*
             Note: Geration of box with diods.
@@ -206,24 +208,15 @@ protected:
                 vertexes[line_points.first] + transform_by_y + transform_by_x, 
                 vertexes[line_points.first] + transform_by_y - transform_by_x, 
                 vertexes[line_points.second] + transform_by_y - transform_by_x, 
-                material_id
+                box_material_id
             }));
 
             triangles.push_back(triangle_to_earth_coords(triangle{
                 vertexes[line_points.second] + transform_by_y + transform_by_x, 
                 vertexes[line_points.second] + transform_by_y - transform_by_x, 
                 vertexes[line_points.first] + transform_by_y + transform_by_x, 
-                material_id
+                box_material_id
             }));
-
-            /* 
-                Note: Diods generation.
-
-                We are define each diod as litlle blicly triangle, which located inside on line box.
-                In order to place diod into Figure we reduce vector of transform a bit.  
-            */
-            material_id = MaterialTable().get_material_id(material_od_diods);
-            transform_by_y *= (1 - DIST_EPS);
 
             /*
                 Note: Positions of diods.
@@ -246,7 +239,10 @@ protected:
                                 |  /    \  |
                                 | /_diod_\ |
                                 |          |
+
+                In order to place diod inside a Figure we reduce vector `transform_y` a little bit.
             */ 
+            transform_by_y *= (1 - DIST_EPS);
             transform_by_x = norm(transform_by_x) * diod_radius;
             transform_by_z = norm(transform_by_z) * diod_radius;
 
@@ -262,7 +258,7 @@ protected:
                     center_of_diod + transform_by_z, 
                     center_of_diod - transform_by_x, 
                     center_of_diod + transform_by_x, 
-                    material_id
+                    diod_material_id
                 }));
             }
         }
@@ -278,11 +274,11 @@ protected:
     float diod_radius = 0.015f;
     const float box_width_factor = 2.0f;
 
-    const material material_od_boxes = material{color{0, 0, 0}, 0.85, 0, 0};
-    const material material_od_diods = material{color{0.85, 0.85, 0.85}, 0.9, 0.9, 0};
+    const material material_od_boxes = material{color{0, 0, 0}, 0.0f, 0, 0};
+    const material material_od_diods = material{color{0.85, 0.85, 0.85}, 0.95, 0.5, 0};
 
     const color diod_energy_color = color{0.8f, 0.8f, 1.0f};
-    const float diod_energy_power = 0.8f;
+    const float diod_energy_power = 0.75f;
 
 // constant paramters dependent to Figure type
     vector<line> lines;
