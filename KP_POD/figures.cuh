@@ -275,7 +275,7 @@ protected:
     const float box_width_factor = 2.0f;
 
     const material material_od_boxes = material{color{0, 0, 0}, 0.0f, 0, 0};
-    const material material_od_diods = material{color{0.85, 0.85, 0.85}, 0.95, 0.5, 0};
+    const material material_od_diods = material{color{1.0, 1.0, 1.0}, 1.0, 1.0, 0};
 
     const color diod_energy_color = color{0.8f, 0.8f, 1.0f};
     const float diod_energy_power = 0.75f;

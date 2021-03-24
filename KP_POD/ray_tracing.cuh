@@ -49,15 +49,17 @@ float triangle_intersected(const back_ray& ray, const triangle& current_triangle
 
     float u = dot(p, t) / div_n;
 
+    if(u < 0.0f || u > 0.0f){
+        return -1.0f;
+    }
+
     float_3 q = cross(t, e1);
 
     float v = dot(q, ray.dir) / div_n;
 
-    float ts = dot(q, e2) / div_n;
-
     // TODO: Investigate that if/else 3 times may slow our program, beter run if/else at ones?
-    if(u >= 0.0 && v >= 0.0 && v + u <= 1.0){
-        return ts;
+    if(v >= 0.0f && v + u <= 1.0){
+        return dot(q, e2) / div_n;
     }
 
     return -1.0f;
