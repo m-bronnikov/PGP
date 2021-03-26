@@ -289,6 +289,203 @@ protected:
     const point coordinats_of_center;
 };
 
+/*
+    Note: Class of Tetraeder
+*/
+class Tetraeder : public Figure3d{
+public:
+    Tetraeder(float radius_of_figure, const float_3& center_position, const material& glass_material, uint8_t diods_on_line) 
+    : Figure3d(radius_of_figure, center_position, glass_material, diods_on_line){
+        // Generate Tetraeder data:
+        angle_between_edges = acos(1.0 / 3.0);
+        set_lines_and_edges_of_figure();
+        generate_figure();
+    }
+
+private:
+    /*
+        Note: Vertexes of Tetraeder
+    */
+    void generate_figure_vertexes() final{
+        vertexes.resize(4);
+
+        vertexes[0] = {-sqrt(3.0f)/2.0f, -1.0f/2.0f, 0.0f}; // A
+        vertexes[1] = {sqrt(3.0f)/2.0f, -1.0f/2.0f, 0.0f}; // B
+        vertexes[2] = {0.0f, 1.0f, 0.0f}; // C
+        vertexes[3] = {0.0f, 0.0f, 1.0f}; // D
+    }
+
+    /*
+        Note: Edges of Tetraeder
+
+        This method generates and pushes triangles of edges to scene.
+    */
+    void split_edge_triangles(vector<triangle>& triangles) const final{
+        uint32_t material_id = MaterialTable().get_material_id(trig_material);
+
+        // For each edge:
+        for(auto& edge_idxs : edges){
+            /*
+                Note: Moving to line boxes.
+
+                As described above, we use transform of lines to produce boxes and diods. 
+                Here we should transform edges in order to join them with line boxes.
+
+                Let's use parrallel move of all vertexes of edges for that. Direction of transformation move - 
+                the center of gravity of edge's vertexes (and in same time ortogonal vector to this edge).
+
+                Distance of transform defined as:
+                        `len_of_transform = transform_x / sin((Pi - angle)/2)`
+
+                Value of `transform_x` defined above! Improvement of this formula also deprecated. Please believe =)
+            */
+    
+            // Center of gravity computation:
+            float_3 transform = {0.0, 0.0, 0.0};
+            for(auto v_idx : edge_idxs){
+                transform += vertexes[v_idx];
+            }
+
+            {
+                float len_of_x_transform = diod_radius * box_width_factor;
+                float len_of_transform = len_of_x_transform / sin((M_PI - angle_between_edges) / 2.0);
+
+                transform = norm(transform) * len_of_transform;
+            }
+
+            // Info: Uncomment this if you want a gap's beetwen edges and boxes.
+            // transform *=  0.0f;
+
+
+            // Generate triangles:
+            triangles.push_back(triangle_to_earth_coords(triangle{
+                vertexes[edge_idxs[0]] + transform, 
+                vertexes[edge_idxs[1]] + transform, 
+                vertexes[edge_idxs[2]] + transform,
+                material_id
+            }));
+        }
+    }
+
+private:
+    /*
+        Note: Lines and Edges
+
+        In generated array of vertexes we can distill folowing lines and edges: 
+    */
+    void set_lines_and_edges_of_figure(){
+        lines = {
+            {0, 1}, {1, 2}, {2, 0}, {0, 3}, {1, 3}, {2, 3}
+        };
+
+        edges = {
+            {0, 1, 2}, {0, 3, 2},
+            {0, 3, 1}, {1, 3, 2}
+        };
+    }
+};
+
+
+/*
+    Note: Class of Octaeder
+*/
+class Octaeder : public Figure3d{
+public:
+    Octaeder(float radius_of_figure, const float_3& center_position, const material& glass_material, uint8_t diods_on_line) 
+    : Figure3d(radius_of_figure, center_position, glass_material, diods_on_line){
+        // Generate Octaeder data:
+        angle_between_edges = acos(-1.0 / 3.0);
+        set_lines_and_edges_of_figure();
+        generate_figure();
+    }
+
+private:
+    /*
+        Note: Vertexes of Octaeder
+    */
+    void generate_figure_vertexes() final{
+        vertexes.resize(6);
+
+        vertexes[0] = {-sqrt(2.0f)/2.0f, -sqrt(2.0f)/2.0f, 0.0f}; // A
+        vertexes[1] = {sqrt(2.0f)/2.0f, -sqrt(2.0f)/2.0f, 0.0f}; // B
+        vertexes[2] = {sqrt(2.0f)/2.0f, sqrt(2.0f)/2.0f, 0.0f}; // C
+        vertexes[3] = {-sqrt(2.0f)/2.0f, sqrt(2.0f)/2.0f, 0.0f}; // D
+        vertexes[4] = {0.0f, 0.0f, -1.0f}; // E
+        vertexes[5] = {0.0f, 0.0f, 1.0f}; // F
+    }
+
+    /*
+        Note: Edges of Octaeder
+
+        This method generates and pushes triangles of edges to scene.
+    */
+    void split_edge_triangles(vector<triangle>& triangles) const final{
+        uint32_t material_id = MaterialTable().get_material_id(trig_material);
+
+        // For each edge:
+        for(auto& edge_idxs : edges){
+            /*
+                Note: Moving to line boxes.
+
+                As described above, we use transform of lines to produce boxes and diods. 
+                Here we should transform edges in order to join them with line boxes.
+
+                Let's use parrallel move of all vertexes of edges for that. Direction of transformation move - 
+                the center of gravity of edge's vertexes (and in same time ortogonal vector to this edge).
+
+                Distance of transform defined as:
+                        `len_of_transform = transform_x / sin((Pi - angle)/2)`
+
+                Value of `transform_x` defined above! Improvement of this formula also deprecated. Please believe =)
+            */
+    
+            // Center of gravity computation:
+            float_3 transform = {0.0, 0.0, 0.0};
+            for(auto v_idx : edge_idxs){
+                transform += vertexes[v_idx];
+            }
+
+            {
+                float len_of_x_transform = diod_radius * box_width_factor;
+                float len_of_transform = len_of_x_transform / sin((M_PI - angle_between_edges) / 2.0);
+
+                transform = norm(transform) * len_of_transform;
+            }
+
+            // Info: Incomment this if you want a gap's beetwen edges and boxes.
+            // transform *=  0.0f;
+
+
+            // Generate triangles:
+            triangles.push_back(triangle_to_earth_coords(triangle{
+                vertexes[edge_idxs[0]] + transform, 
+                vertexes[edge_idxs[1]] + transform, 
+                vertexes[edge_idxs[2]] + transform,
+                material_id
+            }));
+        }
+    }
+
+private:
+    /*
+        Note: Lines and Edges
+
+        In generated array of vertexes we can distill folowing lines and edges: 
+    */
+    void set_lines_and_edges_of_figure(){
+        lines = {
+            {0, 1}, {1, 2}, {2, 3}, {3, 0}, 
+            {0, 4}, {1, 4}, {2, 4}, {3, 4},
+            {0, 5}, {1, 5}, {2, 5}, {3, 5}
+        };
+
+        edges = {
+            {0, 4, 1}, {1, 4, 2}, {2, 4, 3}, {3, 4, 0},
+            {0, 5, 1}, {1, 5, 2}, {2, 5, 3}, {3, 5, 0}
+        };
+    }
+};
+
 
 /*
     Note: Class of Dodecaedr
@@ -365,7 +562,7 @@ private:
                 transform = norm(transform) * len_of_transform;
             }
 
-            // Info: Incomment this if you want a gap's beetwen edges and boxes.
+            // Info: Uncomment this if you want a gap's beetwen edges and boxes.
             // transform *=  0.0f;
 
 

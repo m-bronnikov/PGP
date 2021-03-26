@@ -4,6 +4,8 @@
 
 #include <cstdio>
 #include <stdexcept>
+#include <stdlib.h>
+#include <fstream>
 #include "figures.cuh"
 #include "structures.cuh"
 #include "ray_cleaner.cuh"
@@ -18,6 +20,11 @@
  
 using namespace std;
 
+/*
+    Note: Class of scene for rendering
+
+    This class described scene and include all elements of scene and methods for woking with it.
+*/
 class Scene{
 private:
     // Window - parameters of image 
@@ -28,27 +35,85 @@ private:
         uint32_t* device_picture; // finall picture
     };
 
-    // Texture contain params of texture
-    struct Texture{
-        uint32_t width;
-        uint32_t height;
-        cudaArray* array_data;
-        float_3 A;
-        float_3 B;
-        float_3 C;
-        float_3 D;
-        float_3 color; 
-    };
+    /*
+        Note: Texture object creation
 
-    // Q. May be better to introduce structure for recursion memory incapsulation?
+        Here we are read data of texture from file, create corresponding array 
+        on GPU for this data, copy data to array and bind this array to texture 
+        memory wrapper for better hardware perfomace of memory access.
+
+        Method updates amount of allocated memory and returns pointer to data.
+    */
+    cudaArray* gpu_create_floor(uint32_t& allocated){
+        // define array of data
+        cudaArray* device_array;
+        {
+            ifstream floor_fin(path_to_floor, ios::in | ios::binary);
+            if(not floor_fin){
+                throw runtime_error("Floor opening broken!");
+            }
+
+            // image parameters
+            uint32_t width, height;
+            floor_fin.read(reinterpret_cast<char*>(&width), sizeof(uint32_t));
+            floor_fin.read(reinterpret_cast<char*>(&height), sizeof(uint32_t));
+
+            uint32_t size = width*height*sizeof(uint32_t);
+
+            // allocation of data
+            cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
+            throw_on_cuda_error(cudaMallocArray(&device_array, &channel_desc, width, height));
+            allocated += size;
+
+            uint32_t* temp_data = new uint32_t[size];
+            
+            // read of data
+            floor_fin.read(reinterpret_cast<char*>(temp_data), size);
+
+            // copy data to cuda array
+            throw_on_cuda_error(cudaMemcpyToArray(device_array, 0, 0, temp_data, size, cudaMemcpyHostToDevice));
+
+            // free temp data
+            delete[] temp_data;
+        }
+
+        // description of texture data
+        struct cudaResourceDesc res_desc;
+        memset(&res_desc, 0, sizeof(res_desc));
+        res_desc.resType = cudaResourceTypeArray;
+        res_desc.res.array.array = device_array;
+
+        // description of texture properties
+        struct cudaTextureDesc tex_desc;
+        memset(&tex_desc, 0, sizeof(tex_desc));
+        tex_desc.addressMode[0] = cudaAddressModeClamp;
+        tex_desc.addressMode[1] = cudaAddressModeClamp;
+        tex_desc.readMode = cudaReadModeNormalizedFloat;
+        tex_desc.normalizedCoords = 1;
+
+        // create texture data wrapper
+        throw_on_cuda_error(cudaCreateTextureObject(&floor.memory_wrapper, &res_desc, &tex_desc, 0));
+
+        return device_array;
+    }
+
+    /*
+        Note: Destroy floor memory object.
+    */
+    void gpu_destroy_floor(cudaArray* device_array){
+        cudaDestroyTextureObject(floor.memory_wrapper);
+        floor.memory_wrapper = 0;
+
+        cudaFreeArray(device_array);
+    }
 
 public:
     // init scene with viewer param and savepath
     Scene(Camera& cam, FileWriter& fout) 
     : viewer(cam), writter(fout) {
         // set sizes to 0:
-        window.width = texture.height = 0;
-        texture.width = texture.height = 0;
+        window.width  = 0;
+        window.height = 0;
     }
 
     void add_figure(const Figure3d& fig){
@@ -65,13 +130,32 @@ public:
         window.sqrt_scale = sqrt_pixel_rays;
     }
 
-    void set_texture(const string& t_path, float_3 pA, float_3 pB, float_3 pC, float_3 pD, const material& texture_material){
-        // TODO
+    void set_floor(const string& floor_path, float_3 pA, float_3 pB, float_3 pC, float_3 pD, const material& floor_material){
+        // define id of material
+        uint32_t material_id = MaterialTable().get_material_id(floor_material);
+        // set triangles
+        floor.id_of_triangle_1 = render_triangles.size();
+        render_triangles.push_back({pA, pB, pD, material_id});
+
+        floor.id_of_triangle_2 = render_triangles.size();
+        render_triangles.push_back({pC, pB, pD, material_id});
+
+        // allocate and define wrapper before rendering
+        floor.memory_wrapper = 0;
+
+        // save path to texture
+        path_to_floor = floor_path;
     }
 
+    /*
+        Note: Render video of scene
+
+        This is main method of this project, which generates video of scene by frame.
+        Here we allocate memory of GPU and run computations of ray tracing. 
+    */
     void gpu_render_scene(const uint32_t recursion_depth = 1){
-        if(window.width == 0 || window.height == 0 /*&& texture check*/){
-            throw std::runtime_error("Please set texture and window parametrs first!");
+        if(window.width == 0 || window.height == 0 /*&& floor check*/){
+            throw std::runtime_error("Please set floor and window parametrs first!");
         }
 
         // size of upscaled image for ssaa aplication to bigger image
@@ -86,15 +170,6 @@ public:
 
         // get vector of materials
         MaterialTable().save_to_vector(render_maters);
-
-        // TODO Remove this
-        // for(int i = 0; i < render_triangles.size(); ++i){
-        //     cout << "Triangle №" << i + 1 << ":" << endl;
-
-        //     cout << "A: (" << render_triangles[i].a.x << ", " << render_triangles[i].a.y << ", " << render_triangles[i].a.z << ")" << endl;
-        //     cout << "B: (" << render_triangles[i].b.x << ", " << render_triangles[i].b.y << ", " << render_triangles[i].b.z << ")" << endl;
-        //     cout << "C: (" << render_triangles[i].c.x << ", " << render_triangles[i].c.y << ", " << render_triangles[i].c.z << ")" << endl;
-        // }
 
         // Scene parameters:
         cout << "Scene Parametrs" << endl;
@@ -122,9 +197,8 @@ public:
             device_lights, render_lights.data(), 
             sizeof(light_point)*render_lights.size(), 
             cudaMemcpyHostToDevice
-        )); 
-
-        // TODO: Set texture here
+        ));
+        
         throw_on_cuda_error(cudaMalloc((void**)&device_materials, render_maters.size()*sizeof(material)));
         allocated += render_maters.size()*sizeof(material);
         throw_on_cuda_error(cudaMemcpy(
@@ -132,6 +206,8 @@ public:
             sizeof(material)*render_maters.size(), 
             cudaMemcpyHostToDevice
         ));
+
+        cudaArray* floor_array = gpu_create_floor(allocated);
 
         // In order to econom memory, we could move some allocs and deallocs here to the loop
         throw_on_cuda_error(cudaMalloc((void**)&window.device_picture, window.height*window.width*sizeof(uint32_t)));
@@ -177,7 +253,7 @@ public:
                     // TODO: add texture to call
                     gpu_ray_trace<<<TRACE_BLOCKS, TRACE_THREADS>>>(
                         device_rays_data, active_rays_size, device_img, device_materials,
-                        device_triangles, render_triangles.size(),
+                        floor, device_triangles, render_triangles.size(),
                         device_lights, render_lights.size(),
                         scaled_w, scaled_h
                     );
@@ -234,6 +310,7 @@ public:
         throw_on_cuda_error(cudaFree(device_lights));
         throw_on_cuda_error(cudaFree(device_materials));
         throw_on_cuda_error(cudaFree(device_rays_data));
+        throw_on_cuda_error(cudaFreeArray(floor_array));
     }
 
     ~Scene() = default;
@@ -242,13 +319,14 @@ private:
     FileWriter& writter;
     Camera& viewer;
     Window window;
-    Texture texture;
 
     vector<triangle> render_triangles;
     vector<light_point> render_lights;
     vector<material> render_maters;
+    gpu_texture floor;
 
     string path_to_dir;
+    string path_to_floor;
 };
 
 

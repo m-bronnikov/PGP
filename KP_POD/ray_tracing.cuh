@@ -49,7 +49,7 @@ float triangle_intersected(const back_ray& ray, const triangle& current_triangle
 
     float u = dot(p, t) / div_n;
 
-    if(u < 0.0f || u > 0.0f){
+    if(u < 0.0f || u > 1.0f){
         return -1.0f;
     }
 
@@ -195,6 +195,41 @@ float_3 correct_normal(const float_3& incoming_dir, const float_3& normal){
 }
 
 /*
+    Note: Check intersected trianlge is texture.
+*/
+__device__
+bool is_texture(const gpu_texture& floor, uint32_t triangle_id){
+    return (triangle_id == floor.id_of_triangle_1) || (triangle_id == floor.id_of_triangle_2);
+}
+
+/*
+    Note: Define color of intersection with texture.
+
+    We use baricentric coordinates as normilized coordinates of texture memory. 
+    Hardware specific of texture memory allows to get float4 data from stored uchar4 data.
+*/
+__device__
+float_3 color_of_texture_intersection(back_ray& ray, const gpu_texture& floor, const triangle* array_of_triangles){
+    triangle floor_triangle = array_of_triangles[floor.id_of_triangle_1];
+    
+    // define baricentric coordinates
+    float_3 e1 = floor_triangle.b - floor_triangle.a;
+    float_3 e2 = floor_triangle.c - floor_triangle.a;
+    float_3 p = cross(ray.dir, e2);
+    float div_n = dot(p, e1);
+
+    float_3 t = ray.from - floor_triangle.a;
+    float_3 q = cross(t, e1);
+    
+    float u = dot(p, t) / div_n;
+    float v = dot(q, ray.dir) / div_n;
+
+    float4 color = tex2D<float4>(floor.memory_wrapper, v, u);
+
+    return {color.x, color.y, color.z};
+}
+
+/*
     Note: In ray tracing we do not use radiation from back side of surface (even if surface refract rays).
         This fact entails disadvantage of our implementaion and classic ray tracing. 
         Example:
@@ -279,7 +314,7 @@ It possible because shading of ray is associative operation.
 __global__
 void gpu_ray_trace(
     recursion* array_of_rays_info, uint32_t active_rays_count,
-    float_3* image, material* scene_materials,
+    float_3* image, material* scene_materials, gpu_texture floor,
     triangle* array_scene_triangles, uint32_t count_of_triangles,
     light_point* array_of_light_points, uint32_t count_of_light_points,
     uint32_t w, uint32_t h
@@ -308,10 +343,14 @@ void gpu_ray_trace(
         float_3 triangle_normal;
         material material_properties;
         {
+            uint32_t id_of_triangle = intersected_triangle_data.id;
             triangle found_triangle = array_scene_triangles[intersected_triangle_data.id]; // intersected triangle
 
-            material_properties = scene_materials[found_triangle.mat_id];
             triangle_normal = correct_normal(current_ray_info.ray.dir, normal_of_triangle(found_triangle));
+            material_properties = scene_materials[found_triangle.mat_id];
+            if(is_texture(floor, id_of_triangle)){
+                material_properties.color *= color_of_texture_intersection(current_ray_info.ray, floor, array_scene_triangles);
+            }
         }
 
         // Jump to intersection
@@ -327,7 +366,7 @@ void gpu_ray_trace(
 
               TODO: Investigate gain from usge this model and correct of using specular == reflections coeffs.
         */
-        float_3 overall_lights_shine = {0.0, 0.0, 0.0}; 
+        float_3 overall_lights_shine = {0.0, 0.0, 0.0};
 
         for(uint32_t point_id = 0; point_id < count_of_light_points; ++point_id){
             // Get light_source and create ray to this point^

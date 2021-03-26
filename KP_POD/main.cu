@@ -72,33 +72,32 @@ int main(){
     Scene scene(camera, writter);
 
     // 5.
-    // TODO: change figures
-    // dodecaedr:
+    // Tetraeder:
     cin >> center.x >> center.y >> center.z;
     cin >> color.x >> color.y >> color.z;
     cin >> radius;
     cin >> reflection >> refraction;
     cin >> line_lights; 
-    material fig_glass = {color, 0.5, reflection, refraction}; // set diffusion as 1 by default
+    material fig_glass = {color, 0.5, reflection, refraction}; // set diffusion as 0.5 by default
+    scene.add_figure(Tetraeder(radius, center, fig_glass, line_lights));
+
+    // Octaeder:
+    cin >> center.x >> center.y >> center.z;
+    cin >> color.x >> color.y >> color.z;
+    cin >> radius;
+    cin >> reflection >> refraction;
+    cin >> line_lights; 
+    fig_glass = {color, 0.5, reflection, refraction}; // set diffusion as 0.5 by default
+    scene.add_figure(Octaeder(radius, center, fig_glass, line_lights));
+
+    // Dodecaedr:
+    cin >> center.x >> center.y >> center.z;
+    cin >> color.x >> color.y >> color.z;
+    cin >> radius;
+    cin >> reflection >> refraction;
+    cin >> line_lights; 
+    fig_glass = {color, 1.0, reflection, refraction}; // set diffusion as 0.5 by default
     scene.add_figure(Dodecaedr(radius, center, fig_glass, line_lights));
-
-    // dodecaedr:
-    cin >> center.x >> center.y >> center.z;
-    cin >> color.x >> color.y >> color.z;
-    cin >> radius;
-    cin >> reflection >> refraction;
-    cin >> line_lights; 
-    fig_glass = {color, 1.0, reflection, refraction}; // set diffusion as 1 by default
-    //scene.add_figure(Dodecaedr(radius, center, fig_glass, line_lights));
-
-    // dodecaedr:
-    cin >> center.x >> center.y >> center.z;
-    cin >> color.x >> color.y >> color.z;
-    cin >> radius;
-    cin >> reflection >> refraction;
-    cin >> line_lights; 
-    fig_glass = {color, 1.0, reflection, refraction}; // set diffusion as 1 by default
-    //scene.add_figure(Dodecaedr(radius, center, fig_glass, line_lights));
 
     // 6.
     cin >> floor_A.x >> floor_A.y >> floor_A.z;
@@ -108,7 +107,7 @@ int main(){
     cin >> texture_path;
     cin >> texture_color.x >> texture_color.y >> texture_color.z;
     cin >> texture_refl;
-    // material text_mat = {texture_color, 1.0, texture_refl, 0.0}; // setd diffusion as 1.0
+    material texture_mat = {texture_color, 1.0, texture_refl, 0.0}; // setd diffusion as 1.0
 
     // 7.
     cin >> light_num;
@@ -125,6 +124,7 @@ int main(){
 
     // set window before render:
     scene.set_window(width, height, sqrt_per_pixel);
+    scene.set_floor(texture_path, floor_A, floor_B, floor_C, floor_D, texture_mat);
 
     // launch render ;)
     scene.gpu_render_scene(recursion_depth);

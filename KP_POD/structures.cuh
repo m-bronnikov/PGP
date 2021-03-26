@@ -109,14 +109,23 @@ struct recursion{
 
 /* Note: Texture properties.
 
-  // TODO reafactor this
+    Each texture divided to 2 triangles for intersection and 
+    position difinition with texture memory block for color definition.
+
+    Let's store here indexes of these triangles in generall array of triangles
 */
-struct textures{
-    float_3 A;
-    float_3 B;
-    float_3 C;
-    float_3 D;
-    float_3 color;
+struct gpu_texture{
+    uint32_t id_of_triangle_1;
+    uint32_t id_of_triangle_2;
+
+    cudaTextureObject_t memory_wrapper;
+};
+
+struct cpu_texture{
+    uint32_t id_of_triangle_1;
+    uint32_t id_of_triangle_2;
+
+    uchar4* memory_data;
 };
 
 // Hash function for material's
