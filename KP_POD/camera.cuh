@@ -46,7 +46,7 @@ private:
 
         float_3 vz = norm(pn - pc);
         float_3 vx = norm(cross(vz, {0.0, 0.0, 1.0}));
-        float_3 vy = norm(cross(vx, vz));
+        float_3 vy = -norm(cross(vx, vz));
 
         view_matrix = {vx, vy, vz};
     }

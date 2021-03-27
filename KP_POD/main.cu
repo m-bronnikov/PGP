@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <sstream>
 #include <math.h>
 
 #include "figures.cuh"
@@ -11,18 +12,73 @@
 
 using namespace std;
 
-/*
-Not Done:
-    1. Textures
-    2. Bugs resolution
-    3. InfoLogs with time computations
-    4. Documental comments
-*/
+string help_message(){
+    stringstream out;
+    out << "Usage: ./run [arg]" << endl;
+    out << endl << "`arg` may be:" << endl;
+    out << "1. `--gpu` for set Nvidia GPU as backend" << endl;
+    out << "2. `--cpu` for set CPU as backend" << endl;
+    out << "3. `--default` for print deafult configuration and exit" << endl;
+    out << "4. `--help` for print this message and exit" << endl;
+    out << endl << "Made by Max Bronnikov" << endl;
 
+    return out.str();
+}
 
-int main(){
+string best_configuration(){
+    stringstream out;
+    out << "The best configuration:" << endl;
+    // frames
+    out << "104" << endl;
+    // save path
+    out << "data/%d.data" << endl;
+    // w, h, angle
+    out << "720 480 120" << endl;
+    // camera
+    out << "4.0 3.0 0.0 2.0 1.0 2.0 6.0 1.0 0.0 0.0" << endl;
+    out << "1.0 0.0 0.0 0.5 0.1 1.0 4.0 1.0 0.0 0.0" << endl;
+    // figures
+    out << "2.0 0.0 0.0 1.0 0.0 0.0 1.5 0.9 0.5 10" << endl;
+    out << "0.0 2.0 0.0 0.0 1.0 0.0 1.0 0.8 0.5 5" << endl;
+    out << "0.0 0.0 0.0 0.0 0.7 0.7 0.85 0.7 0.3 5" << endl;
+    // texture
+    out << "-5.0 -5.0 -1.0 -5.0 5.0 -1.0 5.0 5.0 -1.0 5.0 -5.0 -1.0" << endl;
+    out << "textures/floor.data 0.0 1.0 0.0 0.5" << endl;
+    // lights
+    out << "2" << endl;
+    out << "-10.0 0.0 10.0 1.0 1.0 1.0" << endl;
+    out << "1.0 0.0 10.0 1.0 0.0 1.0" << endl;
+    // recursion and avg_pool winow size
+    out << "6 2" << endl;
 
-    // Need to read
+    return out.str();
+}
+
+int main(int argc, const char** argv){
+    // Define backend and work with user parameter
+    bool is_gpu = true;
+    if(argc == 2){
+        string arg = argv[1];
+
+        if(arg == "--gpu"){
+            is_gpu = true;
+        }else if(arg == "--cpu"){
+            is_gpu = false;
+        }else if(arg == "--deafult"){
+            cout << best_configuration() << endl;
+            return 0;
+        }else if(arg == "--help" || arg == "-h"){
+            cout << help_message() << endl;
+            return 0;
+        }else{
+            throw invalid_argument("Unknown command line parameter!");
+        }
+    }else{
+        cerr << help_message() << endl;
+        throw invalid_argument("Command line parameter not found!");
+    }
+
+    // Read properties of rendering scene
     uint32_t frames;
 
     string path_modifier;
@@ -69,7 +125,7 @@ int main(){
         rn_0, zn_0, fn_0, An_r, An_z, wn_r, wn_z, wn_f, pn_r, pn_z
     );
 
-    Scene scene(camera, writter);
+    Scene scene(camera, writter, cout, is_gpu);
 
     // 5.
     // Tetraeder:
@@ -96,7 +152,7 @@ int main(){
     cin >> radius;
     cin >> reflection >> refraction;
     cin >> line_lights; 
-    fig_glass = {color, 1.0, reflection, refraction}; // set diffusion as 0.5 by default
+    fig_glass = {color, 0.5, reflection, refraction}; // set diffusion as 0.5 by default
     scene.add_figure(Dodecaedr(radius, center, fig_glass, line_lights));
 
     // 6.
@@ -107,7 +163,7 @@ int main(){
     cin >> texture_path;
     cin >> texture_color.x >> texture_color.y >> texture_color.z;
     cin >> texture_refl;
-    material texture_mat = {texture_color, 1.0, texture_refl, 0.0}; // setd diffusion as 1.0
+    material texture_mat = {texture_color, 0.5, texture_refl, 0.0}; // setd diffusion as 1.0
 
     // 7.
     cin >> light_num;
@@ -128,8 +184,6 @@ int main(){
 
     // launch render ;)
     scene.gpu_render_scene(recursion_depth);
-
-    cout << "Program successfully ends!" << endl;
 
     return 0;
 }

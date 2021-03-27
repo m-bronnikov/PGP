@@ -15,7 +15,7 @@ public:
     : path_mod(modifier), size(w * h), width(w), height(h){
         h_data = new uint32_t[size];
         if(!h_data){
-            throw runtime_error("Alloc Error");
+            throw runtime_error("Allocation Error");
         }
     }
 

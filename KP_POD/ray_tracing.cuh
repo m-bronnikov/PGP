@@ -119,7 +119,7 @@ float_3 compute_radiocity_losses(
     uint32_t count_of_triangles, uint32_t exclude_triangle_id, float distance_to_target
 ){
     float_3 power = {1.0, 1.0, 1.0};
-    for(uint32_t i = 0; i < count_of_triangles; ++i){
+    for(uint32_t i = 0; i < count_of_triangles /*&& abs(power) > EPSILON*/; ++i){
         triangle barrier_triangle = array_scene_triangles[i];
 
 		float ts = triangle_intersected(ray, barrier_triangle); 	

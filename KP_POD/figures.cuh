@@ -105,7 +105,6 @@ protected:
     virtual void split_edge_triangles(vector<triangle>& triangles) const = 0;
 
 protected:
-
     /*
         Note: Turn lights on.
 
@@ -271,14 +270,14 @@ protected:
     material trig_material;
 
 // constant parameters, defined by developer
-    float diod_radius = 0.015f;
+    float diod_radius = 0.04f;
     const float box_width_factor = 2.0f;
 
     const material material_od_boxes = material{color{0, 0, 0}, 0.0f, 0, 0};
     const material material_od_diods = material{color{1.0, 1.0, 1.0}, 1.0, 1.0, 0};
 
-    const color diod_energy_color = color{0.8f, 0.8f, 1.0f};
-    const float diod_energy_power = 0.75f;
+    const color diod_energy_color = color{1.0f, 1.0f, 1.0f};
+    const float diod_energy_power = 0.7f;
 
 // constant paramters dependent to Figure type
     vector<line> lines;
@@ -355,7 +354,6 @@ private:
 
             // Info: Uncomment this if you want a gap's beetwen edges and boxes.
             // transform *=  0.0f;
-
 
             // Generate triangles:
             triangles.push_back(triangle_to_earth_coords(triangle{
