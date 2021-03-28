@@ -74,9 +74,9 @@ int main(int argc, const char** argv){
         }else{
             throw invalid_argument("Unknown command line parameter!");
         }
-    }else{
+    }else if(argc > 2){
         cerr << help_message() << endl;
-        throw invalid_argument("Command line parameter not found!");
+        throw invalid_argument("Wrong command line parameters count!");
     }
 
     // Read properties of rendering scene
