@@ -308,9 +308,9 @@ private:
     void generate_figure_vertexes() final{
         vertexes.resize(4);
 
-        vertexes[0] = {-sqrt(3.0f)/2.0f, -1.0f/2.0f, 0.0f}; // A
-        vertexes[1] = {sqrt(3.0f)/2.0f, -1.0f/2.0f, 0.0f}; // B
-        vertexes[2] = {0.0f, 1.0f, 0.0f}; // C
+        vertexes[0] = {-2.0f/sqrt(6.0f), -sqrt(2.0f)/3.0f, -1.0/3.0f}; // A
+        vertexes[1] = {2.0f/sqrt(6.0f), -sqrt(2.0f)/3.0f, -1.0/3.0f}; // B
+        vertexes[2] = {0.0f, 2*sqrt(2.0f)/3.0f, -1.0/3.0f}; // C
         vertexes[3] = {0.0f, 0.0f, 1.0f}; // D
     }
 

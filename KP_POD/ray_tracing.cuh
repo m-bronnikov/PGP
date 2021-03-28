@@ -307,7 +307,7 @@ float_3 phong_shading(
     // diffusion
     float phong_coeff = material_properties.diffussion * dot(normal, ray_to_light);
     // specular
-    phong_coeff += material_properties.reflection * max(0.0, pow(dot(reflect(ray_to_light, normal), ray_to_viewer), SPEC_POW));
+    phong_coeff += material_properties.reflection * max(0.0, powf(dot(reflect(ray_to_light, normal), ray_to_viewer), SPEC_POW));
 
     // multiplication of colors with portion factor
     float_3 color = shine_source.color * material_properties.color * radiocity_portion;
@@ -610,8 +610,8 @@ void gpu_ssaa(uint32_t* picture, const float_3* image, uint32_t w, uint32_t h, u
 
     uint32_t big_w = w * sqrt_per_pixel;
 
-    for(int32_t i = idx; i < h; i += thread_step_x){
-        for(int32_t j = idy; j < w; j += thread_step_y){
+    for(uint32_t i = idx; i < h; i += thread_step_x){
+        for(uint32_t j = idy; j < w; j += thread_step_y){
 
             uint32_t thread_start_y = i * sqrt_per_pixel;
             uint32_t thread_start_x = j * sqrt_per_pixel;
@@ -619,8 +619,8 @@ void gpu_ssaa(uint32_t* picture, const float_3* image, uint32_t w, uint32_t h, u
             float_3 mean = {0.0, 0.0, 0.0};
 
             // Compute single pixel of picture as average value of window.
-            for(int n = thread_start_y; n < thread_start_y + sqrt_per_pixel; ++n){
-                for(int m = thread_start_x; m < thread_start_x + sqrt_per_pixel; ++m){
+            for(uint32_t n = thread_start_y; n < thread_start_y + sqrt_per_pixel; ++n){
+                for(uint32_t m = thread_start_x; m < thread_start_x + sqrt_per_pixel; ++m){
                     mean += image[n*big_w + m];
                 }
             }
@@ -636,16 +636,16 @@ __host__
 void cpu_ssaa(uint32_t* picture, const float_3* image, uint32_t w, uint32_t h, uint32_t sqrt_per_pixel){
     uint32_t big_w = w * sqrt_per_pixel;
 
-    for(int32_t i = 0; i < h; ++i){
-        for(int32_t j = 0; j < w; ++j){
+    for(uint32_t i = 0; i < h; ++i){
+        for(uint32_t j = 0; j < w; ++j){
             uint32_t start_y = i * sqrt_per_pixel;
             uint32_t start_x = j * sqrt_per_pixel;
 
             float_3 mean = {0.0, 0.0, 0.0};
 
             // Compute single pixel of picture as average value of window.
-            for(int n = start_y; n < start_y + sqrt_per_pixel; ++n){
-                for(int m = start_x; m < start_x + sqrt_per_pixel; ++m){
+            for(uint32_t n = start_y; n < start_y + sqrt_per_pixel; ++n){
+                for(uint32_t m = start_x; m < start_x + sqrt_per_pixel; ++m){
                     mean += image[n*big_w + m];
                 }
             }

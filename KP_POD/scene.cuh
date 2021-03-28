@@ -14,9 +14,9 @@
 #include "camera.cuh"
 #include "material_table.cuh"
 
-#define TRACE_BLOCKS 256
+#define TRACE_BLOCKS 64
 #define TRACE_BLOCKS_2D 32
-#define TRACE_THREADS 256
+#define TRACE_THREADS 64
 #define TRACE_THREADS_2D 32
  
 using namespace std;
