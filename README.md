@@ -28,7 +28,7 @@ Here presented all my labs and course projects for **PGP/POD** subjects. All tas
 
 ## Course projects
 
-[POD Course project (Variant №4)](KP_POD) --- `In progress`
+[POD Course project (Variant №4)](KP_POD) --- `Ready`
 
 [PGP Course project (Variant №1)](KP_PGP) --- `Not Ready`
 
