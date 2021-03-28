@@ -2,8 +2,9 @@
 #ifndef __RAY_TRACING_CUH__
 #define __RAY_TRACING_CUH__
 
-#include "structures.cuh"
 #include <vector>
+#include "structures.cuh"
+#include "omp.h"
 
 // infinity value:
 #define MAX_FLOAT 1e+32
@@ -336,7 +337,14 @@ void atomicAdd</*GPU:*/1>(float_3* adress, const float_3& val){
 template<>
 __host__ __device__
 void atomicAdd</*CPU:*/0>(float_3* adress, const float_3& val){
-    *adress += val;
+    #pragma omp atomic
+    adress->x += val.x;
+
+    #pragma omp atomic
+    adress->y += val.y;
+
+    #pragma omp atomic
+    adress->z += val.z;
 }
 
 /*
@@ -514,13 +522,16 @@ void cpu_ray_trace(
     light_point* array_of_light_points, uint32_t count_of_light_points,
     uint32_t w, uint32_t h
 ){
-    // Run CPU version of tracing
-    ray_trace</*CPU:*/0>(
-        0, 1,
-        array_of_rays_info, active_rays_count, image, scene_materials, floor,
-        array_scene_triangles, count_of_triangles, array_of_light_points, 
-        count_of_light_points, w, h
-    );
+    // Run CPU(with OMP) version of tracing
+    #pragma omp parallel
+    {
+        ray_trace</*CPU:*/0>(
+            omp_get_thread_num(), omp_get_num_threads(),
+            array_of_rays_info, active_rays_count, image, scene_materials, floor,
+            array_scene_triangles, count_of_triangles, array_of_light_points, 
+            count_of_light_points, w, h
+        );
+    }
 }
 
 
