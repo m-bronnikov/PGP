@@ -38,7 +38,7 @@ string best_configuration(){
     out << "4.0 3.0 0.0 2.0 1.0 2.0 6.0 1.0 0.0 0.0" << endl;
     out << "1.0 0.0 0.0 0.5 0.1 1.0 4.0 1.0 0.0 0.0" << endl;
     // figures
-    out << "2.0 0.0 0.0 1.0 0.0 0.0 1.5 0.9 0.5 10" << endl;
+    out << "2.0 0.0 0.0 1.0 0.0 0.0 1.25 0.9 0.5 10" << endl;
     out << "0.0 2.0 0.0 0.0 1.0 0.0 1.0 0.8 0.5 5" << endl;
     out << "0.0 0.0 0.0 0.0 0.7 0.7 0.85 0.7 0.3 5" << endl;
     // texture
@@ -53,6 +53,7 @@ string best_configuration(){
 
     return out.str();
 }
+
 
 int main(int argc, const char** argv){
     // Define backend and work with user parameter
@@ -118,7 +119,7 @@ int main(int argc, const char** argv){
     cin >> rc_0 >> zc_0 >> fc_0 >> Ac_r >> Ac_z >> wc_r >> wc_z >> wc_f >> pc_r >> pc_z;
     cin >> rn_0 >> zn_0 >> fn_0 >> An_r >> An_z >> wn_r >> wn_z >> wn_f >> pn_r >> pn_z;
     // create main objects
-    FileWriter writter(width, height, path_modifier);
+    FileWriter writter(width, height, path_modifier, is_gpu);
     Camera camera(
         frames, view_angle, 
         rc_0, zc_0, fc_0, Ac_r, Ac_z, wc_r, wc_z, wc_f, pc_r, pc_z,
@@ -183,7 +184,7 @@ int main(int argc, const char** argv){
     scene.set_floor(texture_path, floor_A, floor_B, floor_C, floor_D, texture_mat);
 
     // launch render ;)
-    scene.gpu_render_scene(recursion_depth);
+    scene.render_scene(recursion_depth);
 
     return 0;
 }

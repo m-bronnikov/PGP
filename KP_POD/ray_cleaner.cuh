@@ -3,6 +3,7 @@
 #define __RAY_CLEANER__
 #include "structures.cuh"
 #include <vector>
+#include <algorithm>
 
 #define CLEAN_BLOCKS 1024u
 #define CLEAN_THREADS 512u
@@ -254,6 +255,23 @@ uint32_t cuda_clean_rays(recursion* d_rays, const uint32_t size, const float boa
     throw_on_cuda_error(cudaFree(d_rcopy));
 
     return good_count;
+}
+
+// for backward sorting
+bool operator<(const recursion& lhs, const recursion& rhs){
+    return lhs.power > rhs.power;
+}
+
+uint32_t cpu_clean_rays(vector<recursion>& rays, const uint32_t size, const float boarder = 0.005){
+    std::sort(begin(rays), end(rays));
+
+    for(uint32_t i = 0; i < size; ++i){
+        if(rays[i].power < boarder){
+            return i + 1;
+        }
+    }
+
+    return size;
 }
 
 

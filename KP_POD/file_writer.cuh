@@ -11,16 +11,18 @@ using namespace std;
 // FileWriter - class which gets GPU global memory buffer and writer img to file
 class FileWriter{
 public:
-    FileWriter(uint32_t w, uint32_t h, const string& modifier) 
-    : path_mod(modifier), size(w * h), width(w), height(h){
-        h_data = new uint32_t[size];
-        if(!h_data){
+    FileWriter(uint32_t w, uint32_t h, const string& modifier, bool is_gpu) 
+    : path_mod(modifier), size(w * h), width(w), height(h), gpu_data(is_gpu){
+        h_data = is_gpu ? (new uint32_t[size]) : nullptr;
+        if(gpu_data && !h_data){
             throw runtime_error("Allocation Error");
         }
     }
 
     ~FileWriter(){
-        delete[] h_data;
+        if(gpu_data){
+            delete[] h_data;
+        }
     }
 
     void write_to_file(uint32_t* d_data, uint32_t file_num){
@@ -38,7 +40,12 @@ private:
     // colors - pointer to gpu global mem
     void write_to_stream(uint32_t* d_data, ostream& os){
         // copy data to host
-        throw_on_cuda_error(cudaMemcpy(h_data, d_data, size*sizeof(int32_t), cudaMemcpyDeviceToHost));
+        if(gpu_data){
+            throw_on_cuda_error(cudaMemcpy(h_data, d_data, size*sizeof(int32_t), cudaMemcpyDeviceToHost));
+        }else{
+            h_data = d_data;
+        }
+
         // write data to stream
         os.write(reinterpret_cast<char*>(&width), sizeof(uint32_t));
         os.write(reinterpret_cast<char*>(&height), sizeof(uint32_t));
@@ -46,6 +53,8 @@ private:
     }
 
 private:
+    bool gpu_data;
+
     string path_mod;
     char buff[256];
     uint32_t* h_data;

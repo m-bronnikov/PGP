@@ -3,6 +3,7 @@
 #define __RAY_TRACING_CUH__
 
 #include "structures.cuh"
+#include <vector>
 
 // infinity value:
 #define MAX_FLOAT 1e+32
@@ -20,9 +21,6 @@ struct search_request
     uint32_t id; // id of triangle
 };
 
-// TODO Define this for textures
-//  texture<uint32_t, 2, cudaReadModeElementType> g_text;
-
 /*
 Note: This function define intersection with triangle and distanse "ts" to this.
       Exist two ways to perform this function:
@@ -34,14 +32,14 @@ Note: This function define intersection with triangle and distanse "ts" to this.
 
     This function return negative value if test failed and "ts" - distance to triangle in other case.
 */
-__device__
+__device__ __host__
 float triangle_intersected(const back_ray& ray, const triangle& current_triangle){
     float_3 e1 = current_triangle.b - current_triangle.a;
     float_3 e2 = current_triangle.c - current_triangle.a;
     float_3 p = cross(ray.dir, e2);
     float div_n = dot(p, e1);
 
-    if (abs(div_n) < EPSILON){
+    if (fabs(div_n) < EPSILON){
         return -1.0f;
     }
 
@@ -70,7 +68,7 @@ Note: This function define nearest intersected by ray triangle from each interse
 
       If intersection doesn't exist, this function return false.
 */
-__device__
+__device__ __host__
 bool search_triangle_intersection(
     search_request& result_contract, const back_ray& ray, const triangle* array_scene_triangles, uint32_t count_of_triangles
 ){
@@ -113,7 +111,7 @@ bool search_triangle_intersection(
 
         // TODO Make float if color components addition is extra.
 */
-__device__
+__device__ __host__
 float_3 compute_radiocity_losses(
     const back_ray& ray, const material* scene_materials, const triangle* array_scene_triangles, 
     uint32_t count_of_triangles, uint32_t exclude_triangle_id, float distance_to_target
@@ -155,7 +153,7 @@ float_3 compute_radiocity_losses(
  
         i - incomming ray, r - reflected ray, n - normal.
 */
-__device__
+__device__ __host__
 float_3 reflect(const float_3& incoming_dir, const float_3& normal){
     float_3 ref = normal;
     ref *= 2.0f * dot(normal, incoming_dir);
@@ -189,7 +187,7 @@ float_3 reflect(const float_3& incoming_dir, const float_3& normal){
     Condition:
     We should change direction of normal if dot(i, normal) > 0.0.
 */
-__device__
+__device__ __host__
 float_3 correct_normal(const float_3& incoming_dir, const float_3& normal){
     return dot(incoming_dir, normal) > 0.0f ? -normal : normal;
 }
@@ -197,8 +195,8 @@ float_3 correct_normal(const float_3& incoming_dir, const float_3& normal){
 /*
     Note: Check intersected trianlge is texture.
 */
-__device__
-bool is_texture(const gpu_texture& floor, uint32_t triangle_id){
+__device__ __host__
+bool is_texture(const render_texture& floor, uint32_t triangle_id){
     return (triangle_id == floor.id_of_triangle_1) || (triangle_id == floor.id_of_triangle_2);
 }
 
@@ -208,8 +206,13 @@ bool is_texture(const gpu_texture& floor, uint32_t triangle_id){
     We use baricentric coordinates as normilized coordinates of texture memory. 
     Hardware specific of texture memory allows to get float4 data from stored uchar4 data.
 */
+template<uint32_t Backend>
+float_3 color_of_texture_intersection(back_ray& ray, const render_texture& floor, const triangle* array_of_triangles);
+
+
+template<>
 __device__
-float_3 color_of_texture_intersection(back_ray& ray, const gpu_texture& floor, const triangle* array_of_triangles){
+float_3 color_of_texture_intersection</*GPU:*/1>(back_ray& ray, const render_texture& floor, const triangle* array_of_triangles){
     triangle floor_triangle = array_of_triangles[floor.id_of_triangle_1];
     
     // define baricentric coordinates
@@ -224,9 +227,32 @@ float_3 color_of_texture_intersection(back_ray& ray, const gpu_texture& floor, c
     float u = dot(p, t) / div_n;
     float v = dot(q, ray.dir) / div_n;
 
-    float4 color = tex2D<float4>(floor.memory_wrapper, v, u);
+    float4 temp = tex2D<float4>(floor.memory_wrapper, v, u);
+    return {temp.x, temp.y, temp.z};
+}
 
-    return {color.x, color.y, color.z};
+template<>
+__host__ __device__
+float_3 color_of_texture_intersection</*CPU:*/0>(back_ray& ray, const render_texture& floor, const triangle* array_of_triangles){
+    triangle floor_triangle = array_of_triangles[floor.id_of_triangle_1];
+    
+    // define baricentric coordinates
+    float_3 e1 = floor_triangle.b - floor_triangle.a;
+    float_3 e2 = floor_triangle.c - floor_triangle.a;
+    float_3 p = cross(ray.dir, e2);
+    float div_n = dot(p, e1);
+
+    float_3 t = ray.from - floor_triangle.a;
+    float_3 q = cross(t, e1);
+    
+    float u = dot(p, t) / div_n;
+    float v = dot(q, ray.dir) / div_n;
+
+    // transform baricentric to indexes from array
+    uint32_t x = floor.width * v;
+    uint32_t y = floor.height * u;
+    
+    return uint32_to_float3(floor.memory_data[y*floor.width + x]);
 }
 
 /*
@@ -251,7 +277,7 @@ float_3 color_of_texture_intersection(back_ray& ray, const gpu_texture& floor, c
 
         Therefore, continue if dot(normal, ray_to_light) <= 0.0
 */
-__device__
+__device__ __host__
 bool is_light_source_on_dark_side(const float_3& source_dir, const float_3& normal){
     return dot(source_dir, normal) < EPSILON;
 }
@@ -273,7 +299,7 @@ bool is_light_source_on_dark_side(const float_3& source_dir, const float_3& norm
 
   TODO: Investigate gain from usge this model and correct of using specular == reflections coeffs.
 */
-__device__
+__device__ __host__
 float_3 phong_shading(
     const float_3& normal, const float_3& ray_to_viewer, const float_3& ray_to_light, 
     const light_point& shine_source, const material material_properties, const float_3& radiocity_portion
@@ -288,6 +314,29 @@ float_3 phong_shading(
 
     // final shade
     return color * shine_source.power * phong_coeff;
+}
+
+/*
+    Note: atomicAdd's versions of float_3 for GPU and CPU: 
+
+    Real atomicAdd must return value before operation, but we don't need it.
+*/
+template<uint32_t Backend>
+void atomicAdd(float_3* adress, const float_3& val);
+
+template<>
+__device__
+void atomicAdd</*GPU:*/1>(float_3* adress, const float_3& val){
+    atomicAdd(&adress->x, val.x);
+    atomicAdd(&adress->y, val.y);
+    atomicAdd(&adress->z, val.z);
+}
+
+// TODO Change this atomic
+template<>
+__host__ __device__
+void atomicAdd</*CPU:*/0>(float_3* adress, const float_3& val){
+    *adress += val;
 }
 
 /*
@@ -311,23 +360,21 @@ We can compute it recursive with following solution:
 
 It possible because shading of ray is associative operation.
 */
-__global__
-void gpu_ray_trace(
+template<uint32_t Backend>
+__device__ __host__
+void ray_trace(
+    uint32_t idx_strt, uint32_t idx_step,
     recursion* array_of_rays_info, uint32_t active_rays_count,
-    float_3* image, material* scene_materials, gpu_texture floor,
+    float_3* image, material* scene_materials, render_texture floor,
     triangle* array_scene_triangles, uint32_t count_of_triangles,
     light_point* array_of_light_points, uint32_t count_of_light_points,
     uint32_t w, uint32_t h
 ){
-    uint32_t thread_step = blockDim.x * gridDim.x;
-    uint32_t thread_start = threadIdx.x + blockIdx.x*blockDim.x;
-
     /*
-        Note: We compute ray tracing for each recursive ray by parallel. 
-              Each ray binded to some pixel.
+        Note: We compute ray tracing for each recursive ray binded to some pixel.
     */
-    for(uint32_t info_id = thread_start; info_id < active_rays_count; info_id += thread_step){
-        recursion current_ray_info = array_of_rays_info[info_id];
+    for(uint32_t info_id = idx_strt; info_id < active_rays_count; info_id += idx_step){
+        recursion& current_ray_info = array_of_rays_info[info_id];
 
         // Create search contract with `id` of nearest intersected ray and `distance` to intersection
         search_request intersected_triangle_data;
@@ -349,7 +396,7 @@ void gpu_ray_trace(
             triangle_normal = correct_normal(current_ray_info.ray.dir, normal_of_triangle(found_triangle));
             material_properties = scene_materials[found_triangle.mat_id];
             if(is_texture(floor, id_of_triangle)){
-                material_properties.color *= color_of_texture_intersection(current_ray_info.ray, floor, array_scene_triangles);
+                material_properties.color *= color_of_texture_intersection<Backend>(current_ray_info.ray, floor, array_scene_triangles);
             }
         }
 
@@ -406,10 +453,10 @@ void gpu_ray_trace(
         
         /*
             Note: Write result to image in global memory.
-            
-            Many rays may try to write shine to target image. Let's use `atomicAdd` for this! 
+
+                  We are use atomic because many threads may try to write to one memory field.
         */
-        atomicAdd(&image[current_ray_info.y * w + current_ray_info.x], overall_lights_shine); 
+        atomicAdd<Backend>(&image[current_ray_info.y * w + current_ray_info.x], overall_lights_shine); 
 
         /*
         Note: Produce new rays. This part pushing new rays:
@@ -439,6 +486,43 @@ void gpu_ray_trace(
     }
 }
 
+__global__
+void gpu_ray_trace(
+    recursion* array_of_rays_info, uint32_t active_rays_count,
+    float_3* image, material* scene_materials, render_texture floor,
+    triangle* array_scene_triangles, uint32_t count_of_triangles,
+    light_point* array_of_light_points, uint32_t count_of_light_points,
+    uint32_t w, uint32_t h
+){
+    uint32_t thread_step = blockDim.x * gridDim.x;
+    uint32_t thread_start = threadIdx.x + blockIdx.x*blockDim.x;
+
+    // Run GPU version of tracing
+    ray_trace</*GPU:*/1>(
+        thread_start, thread_step,
+        array_of_rays_info, active_rays_count, image, scene_materials, floor,
+        array_scene_triangles, count_of_triangles, array_of_light_points, 
+        count_of_light_points, w, h
+    );
+}
+
+__host__
+void cpu_ray_trace(
+    recursion* array_of_rays_info, uint32_t active_rays_count,
+    float_3* image, material* scene_materials, render_texture floor,
+    triangle* array_scene_triangles, uint32_t count_of_triangles,
+    light_point* array_of_light_points, uint32_t count_of_light_points,
+    uint32_t w, uint32_t h
+){
+    // Run CPU version of tracing
+    ray_trace</*CPU:*/0>(
+        0, 1,
+        array_of_rays_info, active_rays_count, image, scene_materials, floor,
+        array_scene_triangles, count_of_triangles, array_of_light_points, 
+        count_of_light_points, w, h
+    );
+}
+
 
 /*
   Note: This pass init start ray for each pixel, using position of viewer and transform matrix.
@@ -449,18 +533,21 @@ void gpu_ray_trace(
         direction of each pixel from big image.
         Also we bind each ray to pixel using coords in order to compute shadings in recursive mode.
 */
-__global__
-void init_vewer_back_rays(recursion* array_of_rays_info, float_3* image, mat_3x3 transform_matrix, float_3 viewer_position, float z, uint32_t w, uint32_t h){
-    uint32_t thread_step = blockDim.x * gridDim.x;
-    uint32_t thread_start = threadIdx.x + blockIdx.x*blockDim.x;
+
+__device__ __host__
+void init_vewer_back_rays(
+    uint32_t idx_strt, uint32_t idx_step,
+    recursion* array_of_rays_info, float_3* image, mat_3x3 transform_matrix, 
+    float_3 viewer_position, float z, uint32_t w, uint32_t h
+){
+    // TODO: compute this on CPU before this kernel launch
     uint32_t active_rays_count = w * h;
     
-    // TODO: compute this on CPU before this kernel launch
     float d_w = 2.0 / (w - 1.0);
     float d_h = 2.0 / (h - 1.0);
     float h_div_w = static_cast<float>(h) / static_cast<float>(w);
 
-    for(uint32_t idx = thread_start; idx < active_rays_count; idx += thread_step){
+    for(uint32_t idx = idx_strt; idx < active_rays_count; idx += idx_step){
         uint32_t i = idx % w;
         uint32_t j = idx / w;
 
@@ -482,13 +569,39 @@ void init_vewer_back_rays(recursion* array_of_rays_info, float_3* image, mat_3x3
     }
 }
 
+__global__
+void gpu_init_vewer_back_rays(
+    recursion* array_of_rays_info, float_3* image, mat_3x3 transform_matrix, 
+    float_3 viewer_position, float z, uint32_t w, uint32_t h
+){
+    uint32_t thread_step = blockDim.x * gridDim.x;
+    uint32_t thread_start = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    init_vewer_back_rays(
+        thread_start, thread_step, 
+        array_of_rays_info, image, transform_matrix, 
+        viewer_position, z, w, h
+    );
+}
+
+__host__
+void cpu_init_vewer_back_rays(
+        recursion* array_of_rays_info, float_3* image, mat_3x3 transform_matrix, 
+        float_3 viewer_position, float z, uint32_t w, uint32_t h
+){    
+    init_vewer_back_rays(
+        0, 1, 
+        array_of_rays_info, image, transform_matrix, 
+        viewer_position, z, w, h
+    );
+}
 
 /*
   Note: In fact this function compute Average Pooling with filter and stride size
         equal to (sqrt, sqrt). This pass needed for Antialiasing.
 */
 __global__
-void ssaa(uint32_t* picture, const float_3* image, uint32_t w, uint32_t h, uint32_t sqrt_per_pixel){
+void gpu_ssaa(uint32_t* picture, const float_3* image, uint32_t w, uint32_t h, uint32_t sqrt_per_pixel){
     int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -517,7 +630,31 @@ void ssaa(uint32_t* picture, const float_3* image, uint32_t w, uint32_t h, uint3
             picture[i*w + j] = float3_to_uint32(clamp_pixel_color(mean));
         }
     }
+}
 
+__host__
+void cpu_ssaa(uint32_t* picture, const float_3* image, uint32_t w, uint32_t h, uint32_t sqrt_per_pixel){
+    uint32_t big_w = w * sqrt_per_pixel;
+
+    for(int32_t i = 0; i < h; ++i){
+        for(int32_t j = 0; j < w; ++j){
+            uint32_t start_y = i * sqrt_per_pixel;
+            uint32_t start_x = j * sqrt_per_pixel;
+
+            float_3 mean = {0.0, 0.0, 0.0};
+
+            // Compute single pixel of picture as average value of window.
+            for(int n = start_y; n < start_y + sqrt_per_pixel; ++n){
+                for(int m = start_x; m < start_x + sqrt_per_pixel; ++m){
+                    mean += image[n*big_w + m];
+                }
+            }
+            mean /= static_cast<float>(sqrt_per_pixel*sqrt_per_pixel);
+
+            // Write value to picture
+            picture[i*w + j] = float3_to_uint32(clamp_pixel_color(mean));
+        }
+    }
 }
 
 #endif // __RAY_TRACING_CUH__

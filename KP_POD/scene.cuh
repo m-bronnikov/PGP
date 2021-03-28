@@ -36,14 +36,18 @@ public:
         window.width  = 0;
         window.height = 0;
         floor.memory_wrapper = 0;
+        floor.memory_data = nullptr;
     }
+
+    ~Scene() = default;
+
 private:
     // Window - parameters of image 
     struct Window{
         uint32_t width;
         uint32_t height;
         uint32_t sqrt_scale;
-        uint32_t* device_picture; // finall picture
+        uint32_t* picture; // finall picture
     };
 
     /*
@@ -52,6 +56,8 @@ private:
         Here we are read data of texture from file, create corresponding array 
         on GPU for this data, copy data to array and bind this array to texture 
         memory wrapper for better hardware perfomace of memory access.
+
+        For CPU backend we just allocate and read data for texture and set `memory_data` of floor.
 
         Method updates amount of allocated memory and returns pointer to data.
     */
@@ -109,12 +115,52 @@ private:
         return device_array;
     }
 
+    uint32_t* cpu_create_floor(uint32_t& allocated){
+        // define array of data
+        uint32_t* floor_array;
+        
+        ifstream floor_fin(path_to_floor, ios::in | ios::binary);
+        if(not floor_fin){
+            throw runtime_error("Floor opening broken!");
+        }
+
+        // image parameters
+        uint32_t width, height;
+        floor_fin.read(reinterpret_cast<char*>(&width), sizeof(uint32_t));
+        floor_fin.read(reinterpret_cast<char*>(&height), sizeof(uint32_t));
+
+        uint32_t size = width*height*sizeof(uint32_t);
+
+        // allocation of data
+        floor_array = new uint32_t[size];
+        if(!floor_array){
+            throw runtime_error("Allocation error!");
+        }
+        allocated += size;
+        
+        // read of data
+        floor_fin.read(reinterpret_cast<char*>(floor_array), size);
+
+        // set floor 
+        floor.width = width;
+        floor.height = height;
+        floor.memory_data = floor_array;
+        floor.memory_wrapper = 0; // 0 means we use cpu texture type
+
+        return floor_array;
+    }
+
     /*
         Note: Destroy floor memory object.
     */
     void gpu_destroy_floor(){
         cudaDestroyTextureObject(floor.memory_wrapper);
         floor.memory_wrapper = 1;
+    }
+
+    void cpu_destroy_floor(){
+        floor.memory_data = nullptr;
+        floor.memory_wrapper = 0;
     }
 
 public:
@@ -152,9 +198,145 @@ public:
     /*
         Note: Render video of scene
 
-        This is main method of this project, which generates video of scene by frame.
-        Here we allocate memory of GPU and run computations of ray tracing. 
+        This is main methods of this project, which generates video of scene by frame.
+        Here we allocate memory of backends and run computations of ray tracing. 
     */
+    void render_scene(const uint32_t recursion_depth = 1){
+        if(gpu_backend){
+            gpu_render_scene(recursion_depth);
+        }else{
+            cpu_render_scene(recursion_depth);
+        }
+    }
+
+private:
+    void cpu_render_scene(const uint32_t recursion_depth = 1){
+        // check texture and window parameter setted
+        if(window.width == 0 || window.height == 0 || floor.memory_wrapper == 0){
+            throw std::runtime_error("Please set floor and window parametrs first!");
+        }
+
+        // size of upscaled image for ssaa aplication to bigger image
+        uint32_t scaled_w = window.width * window.sqrt_scale;
+        uint32_t scaled_h = window.height * window.sqrt_scale;
+
+        float_3* render_img; // this rays colors - upscaled image for ssaa (summary colors for each source ray)
+
+        // get vector of materials
+        MaterialTable().save_to_vector(render_maters);
+
+        // Scene parameters:
+        logger << "SCENE PARAMETERS" << endl << endl;
+        logger << "Image size: " << window.width << "x" << window.height << endl;
+        logger << "Rendering size: " << scaled_w << "x" << scaled_h << endl;
+        logger << "Rays: " << scaled_w*scaled_h << endl;
+        logger << "Triangles: " << render_triangles.size() << endl;
+        logger << "Lights: " << render_lights.size() << endl;
+
+        // Memory allocation:
+        uint32_t allocated = 0;
+
+        allocated += render_triangles.size() * sizeof(triangle);
+        allocated += render_lights.size() * sizeof(light_point);
+        allocated += render_maters.size() * sizeof(material);
+
+        uint32_t* floor_array = cpu_create_floor(allocated);
+
+        uint32_t active_rays_capacity = 2 * scaled_w * scaled_h;
+        vector<recursion> render_rays_data(active_rays_capacity);
+        allocated += active_rays_capacity * sizeof(recursion); 
+
+        render_img = new float_3[scaled_h*scaled_w];
+        if(!render_img){
+            throw runtime_error("Allocation error!");
+        }
+        allocated += scaled_w * scaled_h * sizeof(float_3);
+
+        window.picture = new uint32_t[window.width * window.height];
+        if(!window.picture){
+            throw runtime_error("Allocation error!");
+        }
+        allocated += window.width * window.height * sizeof(uint32_t);
+
+        logger << "------------------------------------------------------" << endl;
+        logger << "Allocated before execution: " << allocated / 1024 / 1024 << "Mb" << endl;
+        logger << "------------------------------------------------------" << endl;
+
+        
+        // main loop
+        logger << endl << "RENDERING" << endl << endl;
+        for(uint32_t number_of_frame = 0; viewer.update_position(); ++number_of_frame){
+            logger << "=======================" << endl;
+            logger << "Rendering frame №" << number_of_frame << endl;
+            auto time_start = steady_clock::now();
+
+            mat_3x3 transformation_matrix = viewer.get_frame_basis(); 
+            float distance_to_viewer = viewer.get_distance_to_viewer();
+            float_3 camera_position = viewer.get_camera_position();
+
+            uint32_t active_rays_size = scaled_h*scaled_w; 
+
+            // init start values
+            cpu_init_vewer_back_rays(
+                render_rays_data.data(), render_img, transformation_matrix, 
+                camera_position, distance_to_viewer, scaled_w, scaled_h
+            );
+            
+            // Loop of recursion here:
+            for(uint32_t _ = 0; _ < recursion_depth && active_rays_size; ++_){
+                logger << "\tRecursive depth №" << _ << " use " << active_rays_size << " rays" << endl;
+
+                // Kernel launch:
+                {
+                    cpu_ray_trace(
+                        render_rays_data.data(), active_rays_size, render_img, render_maters.data(),
+                        floor, render_triangles.data(), render_triangles.size(),
+                        render_lights.data(), render_lights.size(),
+                        scaled_w, scaled_h
+                    );
+
+                    // Kernell potentialy can produce x2 rays count:
+                    active_rays_size <<= 1;
+                }
+
+                // Clean all dead rays from array of active rays:
+                active_rays_size = cpu_clean_rays(render_rays_data, active_rays_size);  
+
+                // Reallocation of memory for recursion if needed:
+                if(active_rays_capacity < (active_rays_size << 1)){
+                    uint32_t was = allocated;
+                    allocated -= active_rays_capacity * sizeof(recursion);
+
+                    active_rays_capacity = active_rays_size << 1;
+
+                    render_rays_data.resize(active_rays_capacity);
+                    allocated += active_rays_capacity * sizeof(recursion);
+
+                    logger << "------------------------------------------------------" << endl;
+                    logger << "Memory reallocated in runtime ";
+                    logger << "from " << was / 1024 /1024 << "Mb to " << allocated / 1024 / 1024 << "Mb" << endl;
+                    logger << "------------------------------------------------------" << endl;
+                }
+            }
+
+            // Call SSAA for anti-aliasing effect.
+            cpu_ssaa(window.picture, render_img, window.width, window.height, window.sqrt_scale);
+
+            writter.write_to_file(window.picture, number_of_frame); // write result to file
+
+            auto time_end = steady_clock::now();
+            logger << "Time of frame rendering: ";
+            logger << (duration_cast<microseconds>(time_end - time_start).count() / 1000.0) << endl;
+            logger << "=======================" << endl;
+        }
+
+        
+        cpu_destroy_floor(); 
+        delete[] floor_array;  
+        delete[] window.picture;
+        delete[] render_img;     
+    }
+
     void gpu_render_scene(const uint32_t recursion_depth = 1){
         // check texture and window parameter setted
         if(window.width == 0 || window.height == 0 || floor.memory_wrapper == 0){
@@ -213,7 +395,7 @@ public:
         cudaArray* floor_array = gpu_create_floor(allocated);
 
         // In order to econom memory, we could move some allocs and deallocs here to the loop
-        throw_on_cuda_error(cudaMalloc((void**)&window.device_picture, window.height*window.width*sizeof(uint32_t)));
+        throw_on_cuda_error(cudaMalloc((void**)&window.picture, window.height*window.width*sizeof(uint32_t)));
         allocated += window.width*window.height*sizeof(uint32_t);
 
         throw_on_cuda_error(cudaMalloc((void**)&device_img, scaled_w*scaled_h*sizeof(float_3)));
@@ -242,8 +424,9 @@ public:
             uint32_t active_rays_size = scaled_h*scaled_w; 
 
             // init start values
-            init_vewer_back_rays<<<TRACE_BLOCKS, TRACE_THREADS>>>(
-                device_rays_data, device_img, transformation_matrix, camera_position, distance_to_viewer, scaled_w, scaled_h
+            gpu_init_vewer_back_rays<<<TRACE_BLOCKS, TRACE_THREADS>>>(
+                device_rays_data, device_img, transformation_matrix, 
+                camera_position, distance_to_viewer, scaled_w, scaled_h
             );
             cudaThreadSynchronize();
             throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
@@ -292,12 +475,12 @@ public:
             }
 
             // Call SSAA for anti-aliasing effect.
-            ssaa<<<dim3(TRACE_BLOCKS_2D, TRACE_BLOCKS_2D), dim3(TRACE_THREADS_2D, TRACE_THREADS_2D)>>>(
-                window.device_picture, device_img, window.width, window.height, window.sqrt_scale
+            gpu_ssaa<<<dim3(TRACE_BLOCKS_2D, TRACE_BLOCKS_2D), dim3(TRACE_THREADS_2D, TRACE_THREADS_2D)>>>(
+                window.picture, device_img, window.width, window.height, window.sqrt_scale
             );
             cudaThreadSynchronize();
 
-            writter.write_to_file(window.device_picture, number_of_frame); // write result to file
+            writter.write_to_file(window.picture, number_of_frame); // write result to file
 
             auto time_end =  steady_clock::now();
             logger << "Time of frame rendering: ";
@@ -307,15 +490,13 @@ public:
 
         gpu_destroy_floor();
         throw_on_cuda_error(cudaFreeArray(floor_array));
-        throw_on_cuda_error(cudaFree(window.device_picture));
+        throw_on_cuda_error(cudaFree(window.picture));
         throw_on_cuda_error(cudaFree(device_img));
         throw_on_cuda_error(cudaFree(device_triangles));
         throw_on_cuda_error(cudaFree(device_lights));
         throw_on_cuda_error(cudaFree(device_materials));
         throw_on_cuda_error(cudaFree(device_rays_data));
     }
-
-    ~Scene() = default;
 
 private:
     bool gpu_backend;
@@ -328,7 +509,8 @@ private:
     vector<triangle> render_triangles;
     vector<light_point> render_lights;
     vector<material> render_maters;
-    gpu_texture floor;
+    render_texture floor;
+    
 
     string path_to_dir;
     string path_to_floor;

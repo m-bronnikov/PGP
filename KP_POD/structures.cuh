@@ -114,18 +114,15 @@ struct recursion{
 
     Let's store here indexes of these triangles in generall array of triangles
 */
-struct gpu_texture{
+struct render_texture{
     uint32_t id_of_triangle_1;
     uint32_t id_of_triangle_2;
-
+    // for gpu:
     cudaTextureObject_t memory_wrapper;
-};
-
-struct cpu_texture{
-    uint32_t id_of_triangle_1;
-    uint32_t id_of_triangle_2;
-
-    uchar4* memory_data;
+    // for cpu:
+    uint32_t* memory_data; 
+    uint32_t width;
+    uint32_t height;
 };
 
 // Hash function for material's
@@ -267,12 +264,23 @@ float_3 normal_of_triangle(const triangle& trig){
 }
 
 __host__ __device__
-uint32_t float3_to_uint32(float_3 color){
+uint32_t float3_to_uint32(const float_3& color){
     uint32_t result = 0;
 
     result |= static_cast<uint32_t>(round(255.0 * color.x)) << 0; //RED
     result |= static_cast<uint32_t>(round(255.0 * color.y)) << 8; //GREEN
     result |= static_cast<uint32_t>(round(255.0 * color.z)) << 16; //BLUE
+
+    return result;
+}
+
+__host__ __device__
+float_3 uint32_to_float3(const uint32_t color){
+    float_3 result;
+
+    result.x = ((color >> 0) & 255) / 255.0f; // RED
+    result.y = ((color >> 8) & 255) / 255.0f; // GREEN
+    result.z = ((color >> 16) & 255) / 255.0f; // BLUE
 
     return result;
 }
