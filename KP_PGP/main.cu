@@ -135,11 +135,11 @@ int main(int argc, char** argv){
     // create main objects
     FileWriter writter(width, height, path_modifier, is_gpu);
     Camera camera(
-        frames, 0, 1, view_angle, 
+        frames, proc_rank, num_of_procs, view_angle, 
         rc_0, zc_0, fc_0, Ac_r, Ac_z, wc_r, wc_z, wc_f, pc_r, pc_z,
         rn_0, zn_0, fn_0, An_r, An_z, wn_r, wn_z, wn_f, pn_r, pn_z
     );
-
+    {
     Scene scene(camera, writter, MpiLogger(cout, proc_rank, num_of_procs), is_gpu);
 
     // 5.
@@ -199,7 +199,9 @@ int main(int argc, char** argv){
 
     // launch render ;)
     scene.render_scene(recursion_depth);
+    }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
 
     return 0;

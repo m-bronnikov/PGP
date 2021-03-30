@@ -24,13 +24,12 @@ public:
         float wnr, float wnz, float wnf, float pnr, float pnz
     ) :  
     count_frames(frames), frame_of_start(start_frame), frames_per_step(step_frames),
-    view_z(1.0 / tan(angle * M_PI / 360.0)),
-    time_step(2.0*M_PI/frames), current_time(-time_step),
+    view_z(1.0 / tan(angle * M_PI / 360.0)), time_step(2.0f*M_PI/frames),
     rc_0(rc0), zc_0(zc0), fc_0(fc0), Ac_r(Acr), Ac_z(Acz), 
     wc_r(wcr), wc_z(wcz), wc_f(wcf), pc_r(pcr), pc_z(pcz),
     rn_0(rn0), zn_0(zn0), fn_0(fn0), An_r(Anr), An_z(Anz), 
     wn_r(wnr), wn_z(wnz), wn_f(wnf), pn_r(pnr), pn_z(pnz){
-        current_time += frame_of_start * time_step;
+        current_time = (static_cast<int64_t>(frame_of_start) - static_cast<int64_t>(frames_per_step)) * time_step;
     }
 
 private:
