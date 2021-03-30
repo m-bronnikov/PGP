@@ -7,25 +7,31 @@
 #include <math.h>
 #include "structures.cuh"
 
+/*
+    Note: Camera
 
-// Camera - generator of scene positions. returns basis of camera in earths coord while 
-// update of position could be done. 
+    Generates postions of viewer on scene in matrix form with traectoria as parameter. 
+    Camera can do this with predefined step and start position.
+*/
 class Camera{
 public:
     // initializer
     Camera(
-        uint32_t frames, float angle,
+        uint32_t frames, uint32_t start_frame, uint32_t step_frames, float angle,
         float rc0, float zc0, float fc0, float Acr, float Acz,
         float wcr, float wcz, float wcf, float pcr, float pcz,
         float rn0, float zn0, float fn0, float Anr, float Anz,
         float wnr, float wnz, float wnf, float pnr, float pnz
     ) :  
-    count_frames(frames), view_z(1.0 / tan(angle * M_PI / 360.0)),
+    count_frames(frames), frame_of_start(start_frame), frames_per_step(step_frames),
+    view_z(1.0 / tan(angle * M_PI / 360.0)),
     time_step(2.0*M_PI/frames), current_time(-time_step),
     rc_0(rc0), zc_0(zc0), fc_0(fc0), Ac_r(Acr), Ac_z(Acz), 
     wc_r(wcr), wc_z(wcz), wc_f(wcf), pc_r(pcr), pc_z(pcz),
     rn_0(rn0), zn_0(zn0), fn_0(fn0), An_r(Anr), An_z(Anz), 
-    wn_r(wnr), wn_z(wnz), wn_f(wnf), pn_r(pnr), pn_z(pnz){}
+    wn_r(wnr), wn_z(wnz), wn_f(wnf), pn_r(pnr), pn_z(pnz){
+        current_time += frame_of_start * time_step;
+    }
 
 private:
     float_3 cilindric_to_decart(float r, float z, float f){
@@ -53,7 +59,7 @@ private:
 
 public:
     bool update_position(){
-        current_time += time_step;
+        current_time += frames_per_step * time_step;
         compute_position(current_time);
 
         return current_time < 2.0 * M_PI;
@@ -71,6 +77,14 @@ public:
         return count_frames;
     }
 
+    uint32_t first_frame(){
+        return frame_of_start;
+    }
+
+    uint32_t frames_jump(){
+        return frames_per_step;
+    }
+
     float get_distance_to_viewer(){
         return view_z;
     }
@@ -81,6 +95,8 @@ private:
     float view_z;
 
     uint32_t count_frames;
+    uint32_t frame_of_start;
+    uint32_t frames_per_step;
 
     float time_step;
     float current_time;

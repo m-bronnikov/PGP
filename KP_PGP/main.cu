@@ -4,7 +4,8 @@
 #include <string>
 #include <sstream>
 #include <math.h>
-
+#include "mpi.h"
+#include "mpi_io.cuh"
 #include "figures.cuh"
 #include "structures.cuh"
 #include "ray_tracing.cuh"
@@ -55,7 +56,20 @@ string best_configuration(){
 }
 
 
-int main(int argc, const char** argv){
+int main(int argc, char** argv){
+    // MPI Init with reader
+    int proc_rank, num_of_procs;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_of_procs);
+    MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank);
+
+    MpiReader is(cin, proc_rank);
+
+    // CUDA GPU Init by procs
+    int device_count;
+    cudaGetDeviceCount(&device_count);
+    cudaSetDevice(proc_rank % device_count);
+
     // Define backend and work with user parameter
     bool is_gpu = true;
     if(argc == 2){
@@ -106,78 +120,78 @@ int main(int argc, const char** argv){
 
     // read:
     // 1.
-    cin >> frames;
+    is >> frames;
 
     // 2.
-    cin >> path_modifier;
+    is >> path_modifier;
 
     // 3.
-    cin >> width >> height;
-    cin >> view_angle;
+    is >> width >> height;
+    is >> view_angle;
 
     // 4.
-    cin >> rc_0 >> zc_0 >> fc_0 >> Ac_r >> Ac_z >> wc_r >> wc_z >> wc_f >> pc_r >> pc_z;
-    cin >> rn_0 >> zn_0 >> fn_0 >> An_r >> An_z >> wn_r >> wn_z >> wn_f >> pn_r >> pn_z;
+    is >> rc_0 >> zc_0 >> fc_0 >> Ac_r >> Ac_z >> wc_r >> wc_z >> wc_f >> pc_r >> pc_z;
+    is >> rn_0 >> zn_0 >> fn_0 >> An_r >> An_z >> wn_r >> wn_z >> wn_f >> pn_r >> pn_z;
     // create main objects
     FileWriter writter(width, height, path_modifier, is_gpu);
     Camera camera(
-        frames, view_angle, 
+        frames, 0, 1, view_angle, 
         rc_0, zc_0, fc_0, Ac_r, Ac_z, wc_r, wc_z, wc_f, pc_r, pc_z,
         rn_0, zn_0, fn_0, An_r, An_z, wn_r, wn_z, wn_f, pn_r, pn_z
     );
 
-    Scene scene(camera, writter, cout, is_gpu);
+    Scene scene(camera, writter, MpiLogger(cout, proc_rank, num_of_procs), is_gpu);
 
     // 5.
     // Tetraeder:
-    cin >> center.x >> center.y >> center.z;
-    cin >> color.x >> color.y >> color.z;
-    cin >> radius;
-    cin >> reflection >> refraction;
-    cin >> line_lights; 
+    is >> center.x >> center.y >> center.z;
+    is >> color.x >> color.y >> color.z;
+    is >> radius;
+    is >> reflection >> refraction;
+    is >> line_lights; 
     material fig_glass = {color, 0.5, reflection, refraction}; // set diffusion as 0.5 by default
     scene.add_figure(Tetraeder(radius, center, fig_glass, line_lights));
 
     // Octaeder:
-    cin >> center.x >> center.y >> center.z;
-    cin >> color.x >> color.y >> color.z;
-    cin >> radius;
-    cin >> reflection >> refraction;
-    cin >> line_lights; 
+    is >> center.x >> center.y >> center.z;
+    is >> color.x >> color.y >> color.z;
+    is >> radius;
+    is >> reflection >> refraction;
+    is >> line_lights; 
     fig_glass = {color, 0.5, reflection, refraction}; // set diffusion as 0.5 by default
     scene.add_figure(Octaeder(radius, center, fig_glass, line_lights));
 
     // Dodecaedr:
-    cin >> center.x >> center.y >> center.z;
-    cin >> color.x >> color.y >> color.z;
-    cin >> radius;
-    cin >> reflection >> refraction;
-    cin >> line_lights; 
+    is >> center.x >> center.y >> center.z;
+    is >> color.x >> color.y >> color.z;
+    is >> radius;
+    is >> reflection >> refraction;
+    is >> line_lights; 
     fig_glass = {color, 0.5, reflection, refraction}; // set diffusion as 0.5 by default
     scene.add_figure(Dodecaedr(radius, center, fig_glass, line_lights));
 
     // 6.
-    cin >> floor_A.x >> floor_A.y >> floor_A.z;
-    cin >> floor_B.x >> floor_B.y >> floor_B.z;
-    cin >> floor_C.x >> floor_C.y >> floor_C.z;
-    cin >> floor_D.x >> floor_D.y >> floor_D.z;
-    cin >> texture_path;
-    cin >> texture_color.x >> texture_color.y >> texture_color.z;
-    cin >> texture_refl;
+    is >> floor_A.x >> floor_A.y >> floor_A.z;
+    is >> floor_B.x >> floor_B.y >> floor_B.z;
+    is >> floor_C.x >> floor_C.y >> floor_C.z;
+    is >> floor_D.x >> floor_D.y >> floor_D.z;
+    is >> texture_path;
+    is >> texture_color.x >> texture_color.y >> texture_color.z;
+    is >> texture_refl;
     material texture_mat = {texture_color, 0.5, texture_refl, 0.0}; // setd diffusion as 1.0
 
     // 7.
-    cin >> light_num;
+    is >> light_num;
     for(uint8_t i = 0; i < light_num; ++i){
         float_3 light_coord, light_color;
-        cin >> light_coord.x >> light_coord.y >> light_coord.z;
-        cin >> light_color.x >> light_color.y >> light_color.z;
+        is >> light_coord.x >> light_coord.y >> light_coord.z;
+        is >> light_color.x >> light_color.y >> light_color.z;
 
         scene.add_light({light_coord, light_color, 1.0}); // set power as 1 by default
     }
 
     // 8.
-    cin >> recursion_depth >> sqrt_per_pixel;
+    is >> recursion_depth >> sqrt_per_pixel;
 
     // set window before render:
     scene.set_window(width, height, sqrt_per_pixel);
@@ -185,6 +199,8 @@ int main(int argc, const char** argv){
 
     // launch render ;)
     scene.render_scene(recursion_depth);
+
+    MPI_Finalize();
 
     return 0;
 }

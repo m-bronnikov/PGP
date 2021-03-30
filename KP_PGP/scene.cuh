@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <fstream>
 #include <chrono>
+#include "mpi_io.cuh"
 #include "figures.cuh"
 #include "structures.cuh"
 #include "ray_cleaner.cuh"
@@ -18,7 +19,7 @@
 #define TRACE_BLOCKS_2D 32
 #define TRACE_THREADS 64
 #define TRACE_THREADS_2D 32
- 
+
 using namespace std;
 using namespace std::chrono;
 
@@ -28,9 +29,9 @@ using namespace std::chrono;
     This class described scene and include all elements of scene and methods for woking with it.
 */
 class Scene{
-public: 
+public:
     // init scene with viewer param, savepath and backend
-    Scene(Camera& cam, FileWriter& fout, ostream& log_stream, bool is_gpu) 
+    Scene(Camera& cam, FileWriter& fout, const MpiLogger& log_stream, bool is_gpu)
     : viewer(cam), writter(fout), logger(log_stream), gpu_backend(is_gpu) {
         // set sizes and descriptors to 0 in order to check window and textures are setted:
         window.width  = 0;
@@ -42,7 +43,7 @@ public:
     ~Scene() = default;
 
 private:
-    // Window - parameters of image 
+    // Window - parameters of image
     struct Window{
         uint32_t width;
         uint32_t height;
@@ -53,8 +54,8 @@ private:
     /*
         Note: Texture object creation
 
-        Here we are read data of texture from file, create corresponding array 
-        on GPU for this data, copy data to array and bind this array to texture 
+        Here we are read data of texture from file, create corresponding array
+        on GPU for this data, copy data to array and bind this array to texture
         memory wrapper for better hardware perfomace of memory access.
 
         For CPU backend we just allocate and read data for texture and set `memory_data` of floor.
@@ -83,7 +84,7 @@ private:
             allocated += size;
 
             uint32_t* temp_data = new uint32_t[size];
-            
+
             // read of data
             floor_fin.read(reinterpret_cast<char*>(temp_data), size);
 
@@ -118,7 +119,7 @@ private:
     uint32_t* cpu_create_floor(uint32_t& allocated){
         // define array of data
         uint32_t* floor_array;
-        
+
         ifstream floor_fin(path_to_floor, ios::in | ios::binary);
         if(not floor_fin){
             throw runtime_error("Floor opening broken!");
@@ -137,11 +138,11 @@ private:
             throw runtime_error("Allocation error!");
         }
         allocated += size;
-        
+
         // read of data
         floor_fin.read(reinterpret_cast<char*>(floor_array), size);
 
-        // set floor 
+        // set floor
         floor.width = width;
         floor.height = height;
         floor.memory_data = floor_array;
@@ -187,7 +188,7 @@ public:
 
         floor.id_of_triangle_2 = render_triangles.size();
         render_triangles.push_back({pC, pB, pD, material_id});
-        
+
         // textures are setted
         floor.memory_wrapper = 1;
 
@@ -199,7 +200,7 @@ public:
         Note: Render video of scene
 
         This is main methods of this project, which generates video of scene by frame.
-        Here we allocate memory of backends and run computations of ray tracing. 
+        Here we allocate memory of backends and run computations of ray tracing.
     */
     void render_scene(const uint32_t recursion_depth = 1){
         if(gpu_backend){
@@ -225,14 +226,6 @@ private:
         // get vector of materials
         MaterialTable().save_to_vector(render_maters);
 
-        // Scene parameters:
-        logger << "SCENE PARAMETERS" << endl << endl;
-        logger << "Image size: " << window.width << "x" << window.height << endl;
-        logger << "Rendering size: " << scaled_w << "x" << scaled_h << endl;
-        logger << "Rays: " << scaled_w*scaled_h << endl;
-        logger << "Triangles: " << render_triangles.size() << endl;
-        logger << "Lights: " << render_lights.size() << endl;
-
         // Memory allocation:
         uint32_t allocated = 0;
 
@@ -244,7 +237,7 @@ private:
 
         uint32_t active_rays_capacity = 2 * scaled_w * scaled_h;
         vector<recursion> render_rays_data(active_rays_capacity);
-        allocated += active_rays_capacity * sizeof(recursion); 
+        allocated += active_rays_capacity * sizeof(recursion);
 
         render_img = new float_3[scaled_h*scaled_w];
         if(!render_img){
@@ -258,34 +251,25 @@ private:
         }
         allocated += window.width * window.height * sizeof(uint32_t);
 
-        logger << "------------------------------------------------------" << endl;
-        logger << "Allocated before execution: " << allocated / 1024 / 1024 << "Mb" << endl;
-        logger << "------------------------------------------------------" << endl;
-
-        
         // main loop
-        logger << endl << "RENDERING" << endl << endl;
-        for(uint32_t number_of_frame = 0; viewer.update_position(); ++number_of_frame){
-            logger << "=======================" << endl;
-            logger << "Rendering frame №" << number_of_frame << endl;
+        for(uint32_t number_of_frame = viewer.first_frame(); viewer.update_position(); number_of_frame += viewer.frames_jump()){
             auto time_start = steady_clock::now();
 
-            mat_3x3 transformation_matrix = viewer.get_frame_basis(); 
+            mat_3x3 transformation_matrix = viewer.get_frame_basis();
             float distance_to_viewer = viewer.get_distance_to_viewer();
             float_3 camera_position = viewer.get_camera_position();
 
-            uint32_t active_rays_size = scaled_h*scaled_w; 
+            uint32_t active_rays_size = scaled_h*scaled_w;
+            uint32_t max_rays_amount = active_rays_size;
 
             // init start values
             cpu_init_vewer_back_rays(
-                render_rays_data.data(), render_img, transformation_matrix, 
+                render_rays_data.data(), render_img, transformation_matrix,
                 camera_position, distance_to_viewer, scaled_w, scaled_h
             );
-            
+
             // Loop of recursion here:
             for(uint32_t _ = 0; _ < recursion_depth && active_rays_size; ++_){
-                logger << "\tRecursive depth №" << _ << " use " << active_rays_size << " rays" << endl;
-
                 // Kernel launch:
                 {
                     cpu_ray_trace(
@@ -300,22 +284,17 @@ private:
                 }
 
                 // Clean all dead rays from array of active rays:
-                active_rays_size = cpu_clean_rays(render_rays_data, active_rays_size);  
+                active_rays_size = cpu_clean_rays(render_rays_data, active_rays_size);
+                max_rays_amount = active_rays_size > max_rays_amount ? active_rays_size : max_rays_amount;
 
                 // Reallocation of memory for recursion if needed:
                 if(active_rays_capacity < (active_rays_size << 1)){
-                    uint32_t was = allocated;
                     allocated -= active_rays_capacity * sizeof(recursion);
 
                     active_rays_capacity = active_rays_size << 1;
 
                     render_rays_data.resize(active_rays_capacity);
                     allocated += active_rays_capacity * sizeof(recursion);
-
-                    logger << "------------------------------------------------------" << endl;
-                    logger << "Memory reallocated in runtime ";
-                    logger << "from " << was / 1024 /1024 << "Mb to " << allocated / 1024 / 1024 << "Mb" << endl;
-                    logger << "------------------------------------------------------" << endl;
                 }
             }
 
@@ -325,16 +304,15 @@ private:
             writter.write_to_file(window.picture, number_of_frame); // write result to file
 
             auto time_end = steady_clock::now();
-            logger << "Time of frame rendering: ";
-            logger << (duration_cast<microseconds>(time_end - time_start).count() / 1000.0) << endl;
-            logger << "=======================" << endl;
+            int time_diff = duration_cast<microseconds>(time_end - time_start).count();
+            logger.write(number_of_frame, max_rays_amount, time_diff);
         }
 
-        
-        cpu_destroy_floor(); 
-        delete[] floor_array;  
+
+        cpu_destroy_floor();
+        delete[] floor_array;
         delete[] window.picture;
-        delete[] render_img;     
+        delete[] render_img;
     }
 
     void gpu_render_scene(const uint32_t recursion_depth = 1){
@@ -356,39 +334,30 @@ private:
         // get vector of materials
         MaterialTable().save_to_vector(render_maters);
 
-        // Scene parameters:
-        logger << "SCENE PARAMETERS" << endl << endl;
-        logger << "Image size: " << window.width << "x" << window.height << endl;
-        logger << "Rendering size: " << scaled_w << "x" << scaled_h << endl;
-        logger << "Rays: " << scaled_w*scaled_h << endl;
-        logger << "Triangles: " << render_triangles.size() << endl;
-        logger << "Lights: " << render_lights.size() << endl;
-
-
         // Memory allocation:
         uint32_t allocated = 0;
 
         throw_on_cuda_error(cudaMalloc((void**)&device_triangles, render_triangles.size()*sizeof(triangle)));
         allocated += render_triangles.size()*sizeof(triangle);
         throw_on_cuda_error(cudaMemcpy(
-            device_triangles, render_triangles.data(), 
-            sizeof(triangle)*render_triangles.size(), 
+            device_triangles, render_triangles.data(),
+            sizeof(triangle)*render_triangles.size(),
             cudaMemcpyHostToDevice
         ));
 
         throw_on_cuda_error(cudaMalloc((void**)&device_lights, render_lights.size()*sizeof(light_point)));
         allocated += render_lights.size()*sizeof(light_point);
         throw_on_cuda_error(cudaMemcpy(
-            device_lights, render_lights.data(), 
-            sizeof(light_point)*render_lights.size(), 
+            device_lights, render_lights.data(),
+            sizeof(light_point)*render_lights.size(),
             cudaMemcpyHostToDevice
         ));
-        
+
         throw_on_cuda_error(cudaMalloc((void**)&device_materials, render_maters.size()*sizeof(material)));
         allocated += render_maters.size()*sizeof(material);
         throw_on_cuda_error(cudaMemcpy(
-            device_materials, render_maters.data(), 
-            sizeof(material)*render_maters.size(), 
+            device_materials, render_maters.data(),
+            sizeof(material)*render_maters.size(),
             cudaMemcpyHostToDevice
         ));
 
@@ -406,35 +375,27 @@ private:
         throw_on_cuda_error(cudaMalloc((void**)&device_rays_data, active_rays_capacity*sizeof(recursion)));
         allocated += active_rays_capacity * sizeof(recursion);
 
-        logger << "------------------------------------------------------" << endl;
-        logger << "Allocated before execution: " << allocated / 1024 / 1024 << "Mb" << endl;
-        logger << "------------------------------------------------------" << endl;
-
         // main loop
-        logger << endl << "RENDERING" << endl << endl;
-        for(uint32_t number_of_frame = 0; viewer.update_position(); ++number_of_frame){
-            logger << "=======================" << endl;
-            logger << "Rendering frame №" << number_of_frame << endl;
+        for(uint32_t number_of_frame = viewer.first_frame(); viewer.update_position(); number_of_frame += viewer.frames_jump()){
             auto time_start = steady_clock::now();
 
-            mat_3x3 transformation_matrix = viewer.get_frame_basis(); 
+            mat_3x3 transformation_matrix = viewer.get_frame_basis();
             float distance_to_viewer = viewer.get_distance_to_viewer();
             float_3 camera_position = viewer.get_camera_position();
 
-            uint32_t active_rays_size = scaled_h*scaled_w; 
+            uint32_t active_rays_size = scaled_h*scaled_w;
+            uint32_t max_rays_amount = active_rays_size;
 
             // init start values
             gpu_init_vewer_back_rays<<<TRACE_BLOCKS, TRACE_THREADS>>>(
-                device_rays_data, device_img, transformation_matrix, 
+                device_rays_data, device_img, transformation_matrix,
                 camera_position, distance_to_viewer, scaled_w, scaled_h
             );
             cudaThreadSynchronize();
             throw_on_cuda_error(cudaGetLastError()); // catch errors from kernel
-            
+
             // Loop of recursion here:
             for(uint32_t _ = 0; _ < recursion_depth && active_rays_size; ++_){
-                logger << "\tRecursive depth №" << _ << " use " << active_rays_size << " rays" << endl;
-
                 // Kernel launch:
                 {
                     gpu_ray_trace<<<TRACE_BLOCKS, TRACE_THREADS>>>(
@@ -451,11 +412,11 @@ private:
                 }
 
                 // Clean all dead rays from array of active rays:
-                active_rays_size = cuda_clean_rays(device_rays_data, active_rays_size);  
+                active_rays_size = cuda_clean_rays(device_rays_data, active_rays_size);
+                max_rays_amount = active_rays_size > max_rays_amount ? active_rays_size : max_rays_amount;
 
                 // Reallocation of memory for recursion if needed:
                 if(active_rays_capacity < (active_rays_size << 1)){
-                    uint32_t was = allocated;
                     allocated -= active_rays_capacity * sizeof(recursion);
 
                     recursion* temporary_device_rays;
@@ -466,11 +427,6 @@ private:
                     throw_on_cuda_error(cudaMemcpy(temporary_device_rays, device_rays_data, sizeof(recursion)*active_rays_size, cudaMemcpyDeviceToDevice));
                     throw_on_cuda_error(cudaFree(device_rays_data));
                     device_rays_data = temporary_device_rays;
-
-                    logger << "------------------------------------------------------" << endl;
-                    logger << "Memory reallocated in runtime ";
-                    logger << "from " << was / 1024 /1024 << "Mb to " << allocated / 1024 / 1024 << "Mb" << endl;
-                    logger << "------------------------------------------------------" << endl;
                 }
             }
 
@@ -483,9 +439,8 @@ private:
             writter.write_to_file(window.picture, number_of_frame); // write result to file
 
             auto time_end =  steady_clock::now();
-            logger << "Time of frame rendering: ";
-            logger << (duration_cast<microseconds>(time_end - time_start).count() / 1000.0) << endl;
-            logger << "=======================" << endl;
+            int time_diff = duration_cast<microseconds>(time_end - time_start).count();
+            logger.write(number_of_frame, max_rays_amount, time_diff);
         }
 
         gpu_destroy_floor();
@@ -500,8 +455,8 @@ private:
 
 private:
     bool gpu_backend;
-    ostream& logger;
-    
+    MpiLogger logger;
+
     FileWriter& writter;
     Camera& viewer;
     Window window;
@@ -510,7 +465,7 @@ private:
     vector<light_point> render_lights;
     vector<material> render_maters;
     render_texture floor;
-    
+
 
     string path_to_dir;
     string path_to_floor;
