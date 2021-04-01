@@ -600,11 +600,15 @@ void cpu_init_vewer_back_rays(
         recursion* array_of_rays_info, float_3* image, mat_3x3 transform_matrix, 
         float_3 viewer_position, float z, uint32_t w, uint32_t h
 ){    
-    init_vewer_back_rays(
-        0, 1, 
-        array_of_rays_info, image, transform_matrix, 
-        viewer_position, z, w, h
-    );
+    // Run CPU(with OMP) version of init
+    #pragma omp parallel
+    {
+        init_vewer_back_rays(
+            omp_get_thread_num(), omp_get_num_threads(),
+            array_of_rays_info, image, transform_matrix, 
+            viewer_position, z, w, h
+        );
+    }
 }
 
 /*
