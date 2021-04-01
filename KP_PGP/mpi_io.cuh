@@ -3,6 +3,7 @@
 
 #include "mpi.h"
 #include <iostream>
+#include <iomanip>
 
 using namespace std;
 
@@ -57,13 +58,17 @@ public:
     MpiLogger(ostream& to_write, int proc_rank, int procs_num)
     : os(to_write), num_of_procs(procs_num), id_of_proc(proc_rank) {
         if(id_of_proc == 0){
-            os << "Frame\tRender Time\tMax Rays" << endl;
+            os << left <<  setw(12) << "Frame";
+            os << internal << setw(10) << "Render Time(ms)";
+            os << right << setw(13) << "Max Rays" << endl;
         }
     }
 
     void write(int frame_num, int rays, int time){
         if(id_of_proc == 0){
-            os << frame_num << "\t" << time / 1000.0f << "ms\t" << rays << endl;
+            os << left <<  setw(12) << frame_num;
+            os << internal << setw(10) << time / 1000.0f;
+            os << right << setw(17) << rays << endl;
 
             // If some proces aborted => all processes after this also aborted.
             int min_count_procs = num_of_procs;
@@ -82,7 +87,9 @@ public:
                 MPI_Recv(&rays, 1, MPI_INT, i, 2, MPI_COMM_WORLD, &tmp);
                 MPI_Recv(&time, 1, MPI_INT, i, 3, MPI_COMM_WORLD, &tmp);
 
-                os << frame_num << "\t" << time / 1000.0f << "ms\t" << rays << endl;
+                os << left << setw(12) << frame_num;
+                os << internal << setw(10) << time / 1000.0f;
+                os << right << setw(17) << rays << endl;
             }
 
             num_of_procs = min_count_procs;
