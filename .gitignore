@@ -1,5 +1,5 @@
 *.asc
 */.vscode
 KP_POD/data/*
-KP_POD/res/*
+KP_*/imgs/*
 KP_*/textures/wood.data
