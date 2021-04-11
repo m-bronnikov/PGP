@@ -117,7 +117,7 @@ float_3 compute_radiocity_losses(
     uint32_t count_of_triangles, uint32_t exclude_triangle_id, float distance_to_target
 ){
     float_3 power = {1.0, 1.0, 1.0};
-    for(uint32_t i = 0; i < count_of_triangles /*&& abs(power) > EPSILON*/; ++i){
+    for(uint32_t i = 0; i < count_of_triangles; ++i){
         triangle barrier_triangle = array_scene_triangles[i];
 
 		float ts = triangle_intersected(ray, barrier_triangle); 	
@@ -125,7 +125,7 @@ float_3 compute_radiocity_losses(
         // `i != exclude_triangle_id` helps to avoid intersections with start position. We can add 
         // this check in start of loop body, but it's rare case and better to check it latter. 
         // TODO optimize this (remove third check)
-		if(ts >= EPSILON && ts < distance_to_target /* && i != exclude_triangle_id */){
+		if(ts >= EPSILON && ts < distance_to_target && i != exclude_triangle_id){
             // TODO: Investigate gain from multipy to color of materaial. May be better to remove.
             material barrier_material = scene_materials[barrier_triangle.mat_id];
             // TODO Remove color mult if needed

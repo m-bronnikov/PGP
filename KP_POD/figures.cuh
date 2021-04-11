@@ -270,7 +270,7 @@ protected:
     material trig_material;
 
 // constant parameters, defined by developer
-    float diod_radius = 0.04f;
+    float diod_radius = 0.02f;
     const float box_width_factor = 2.0f;
 
     const material material_od_boxes = material{color{0, 0, 0}, 0.0f, 0, 0};
