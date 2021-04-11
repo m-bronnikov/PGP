@@ -8,7 +8,7 @@
 // infinity value:
 #define MAX_FLOAT 1e+32
 // precission of float ~1e-7:
-#define EPSILON 1e-6 
+#define EPSILON 4e-6 
 // set as material parametr in future
 #define SPEC_POW 64
 
@@ -157,9 +157,8 @@ __device__ __host__
 float_3 reflect(const float_3& incoming_dir, const float_3& normal){
     float_3 ref = normal;
     ref *= 2.0f * dot(normal, incoming_dir);
-    ref -= incoming_dir;
 
-    return -ref;
+    return incoming_dir - ref;
 }
 
 
@@ -307,7 +306,7 @@ float_3 phong_shading(
     // diffusion
     float phong_coeff = material_properties.diffussion * dot(normal, ray_to_light);
     // specular
-    phong_coeff += material_properties.reflection * max(0.0, powf(dot(reflect(ray_to_light, normal), ray_to_viewer), SPEC_POW));
+    phong_coeff += material_properties.reflection * max(0.0, powf(dot(reflect(-ray_to_light, normal), ray_to_viewer), SPEC_POW));
 
     // multiplication of colors with portion factor
     float_3 color = shine_source.color * material_properties.color * radiocity_portion;
